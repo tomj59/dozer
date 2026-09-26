@@ -18,6 +18,14 @@ const (
 	Command
 )
 
+// Arrow keys pressed as command keys are reported with these Key values.
+const (
+	KeyUp byte = 0x80 + iota
+	KeyDown
+	KeyRight
+	KeyLeft
+)
+
 // Action is one routed piece of input.
 type Action struct {
 	Kind Kind
@@ -37,7 +45,8 @@ type Router struct {
 	Prefix byte // default 0x01 (Ctrl-a)
 
 	pending bool // prefix seen, waiting for the command key
-	skipSeq int  // >0: discarding an escape sequence pressed as a command key
+	skipSeq int  // >0: consuming an escape sequence pressed as a command key
+	seqLen  int  // bytes of that sequence after ESC [ / ESC O
 	inPaste bool
 	match   int // bytes of pasteStart/pasteEnd matched so far
 }
@@ -64,19 +73,24 @@ func (r *Router) Feed(b []byte) []Action {
 			continue
 		}
 		if r.skipSeq > 0 {
-			// An arrow/function key was pressed as the command key. Drop the
-			// rest of its escape sequence so "[A" isn't typed into the pane.
-			// Keys arrive whole in one read, so this never spans chunks.
+			// An Esc/arrow/function key was pressed as the command key.
+			// Plain arrows become KeyUp…KeyLeft commands; any other
+			// sequence (or a lone Esc) just cancels the prefix. Keys
+			// arrive whole in one read, so this never spans chunks.
 			if r.skipSeq == 1 {
 				if c == '[' || c == 'O' {
-					r.skipSeq = 2
+					r.skipSeq, r.seqLen = 2, 0
 					start = i + 1
 					continue
 				}
 				r.skipSeq = 0 // a lone Esc: handle c normally below
 			} else {
+				r.seqLen++
 				if c >= 0x40 && c <= 0x7e { // final byte ends the sequence
 					r.skipSeq = 0
+					if r.seqLen == 1 && c >= 'A' && c <= 'D' {
+						out = append(out, Action{Kind: Command, Key: KeyUp + (c - 'A')})
+					}
 				}
 				start = i + 1
 				continue

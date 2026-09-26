@@ -1,0 +1,24 @@
+# lifecycle.yaml: exercises dead-pane handling (SPEC §4.10). Each pane dies
+# differently so you can see how dozer flags it and restores it.
+#
+#   [1] exits cleanly after 3s          → dim divider, "exited"
+#   [2] fails with status 3 after 4s    → red divider, "✖ exit 3"
+#   [3] kills itself (SIGKILL) after 5s → red divider, "✖ SIGKILL"
+#   [4] crash-loops, restart: on-failure → restarts after 1s, 2s, 4s …
+#   [5] a normal shell (type `exit` to see it die too)
+#
+# Try: Ctrl-a r (restart focused), Ctrl-a R (restart all dead), Ctrl-a q (quit asks first).
+#   dozer -c examples/lifecycle.yaml
+name: lifecycle
+layout: "2,2,1"
+panes:
+  - title: clean-exit
+    exec: 'echo "exiting with 0 in 3s"; sleep 3; exit 0'
+  - title: failure
+    exec: 'echo "failing with 3 in 4s"; sleep 4; exit 3'
+  - title: killed
+    exec: 'echo "SIGKILL in 5s"; sleep 5; kill -KILL $$'
+  - title: crash-loop
+    exec: 'echo "started $(date +%T), crashing in 2s"; sleep 2; exit 1'
+    restart: on-failure
+  - title: shell

@@ -40,8 +40,9 @@ type Terminal struct {
 }
 
 // Open puts the terminal in raw mode and enters the alternate screen.
-func Open() (*Terminal, error) {
-	t := &Terminal{In: os.Stdin, Out: os.Stdout}
+// in is the keyboard (os.Stdin, or /dev/tty when stdin was piped).
+func Open(in *os.File) (*Terminal, error) {
+	t := &Terminal{In: in, Out: os.Stdout}
 	st, err := term.MakeRaw(int(t.In.Fd()))
 	if err != nil {
 		return nil, err

@@ -1,0 +1,15 @@
+# ssh.yaml: a template for watching several servers. Edit the hosts first!
+# exec: ssh … panes show "✖ connection lost" when ssh exits with 255 (it
+# couldn't connect, or the connection dropped); Ctrl-a r reconnects.
+#
+#   dozer -c examples/ssh.yaml
+name: servers
+layout: "2,1"
+panes:
+  - title: web-1
+    exec: ssh web-1.example.com
+  - title: web-2
+    exec: ssh web-2.example.com
+  - title: local
+    # run: keeps a local prompt after the command, handy for scp/rsync.
+    run: echo "local shell, same folder as dozer"

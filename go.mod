@@ -11,7 +11,9 @@ require (
 	github.com/charmbracelet/x/vt v0.0.0-20260924144451-d676b019604b
 	github.com/creack/pty v1.1.24
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02
+	golang.org/x/sys v0.41.0
 	golang.org/x/term v0.37.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -27,7 +29,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
 )
 
 replace github.com/charmbracelet/x/vt => ./third_party/vt

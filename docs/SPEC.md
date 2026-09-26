@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.6 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.7 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -53,6 +53,7 @@ dozer -l 2,1 -p "ssh prod" -p htop    # commands fill panes in reading order; th
 dozer -c ops.yaml                     # load a config file
 dozer ops                             # load profile ~/.config/dozer/ops.yaml
 printf 'ssh a\nssh b\nhtop\n' | dozer # piped: one pane command per line
+dozer -p a -p b -p c -p d            # no -l: the layout is fitted to the commands (4 → 2,2)
 ```
 
 Piped input is read to EOF, then dozer reopens `/dev/tty` for interactive input.
@@ -85,6 +86,7 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 |---|---|
 | `C-a ←↑↓→` / `h j k l` | Move focus |
 | `C-a 1-9` | Focus pane N |
+| `C-a o` | Focus the next pane |
 | `C-a H J K L` | Resize the focused split (existing splits only) |
 | `C-a =` | Reset split sizes to the launch layout |
 | `C-a z` | Zoom or unzoom the focused pane |
@@ -97,7 +99,8 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 | `C-a x` | Kill the pane's process (confirm). The pane stays, as a dead pane. |
 | `C-a t` | Rename the pane title |
 | `C-a s` | Toggle the status bar |
-| `C-a l` | Redraw the whole screen (for example after the host terminal's Cmd-K cleared it) |
+| `C-a C-l` | Redraw the whole screen (for example after the host terminal's Cmd-K cleared it). Moved from `C-a l` in M1, because `l` is focus-right. |
+| `C-a Esc` (while prefix is pending) | Cancel the prefix |
 | `C-a ?` | Help overlay |
 | `C-a q` | Quit dozer (confirm) |
 | `C-a C-a` | Send a literal `C-a` to the pane |
@@ -105,6 +108,9 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 All of these can be remapped in the config.
 
 ### 4.5 Mouse
+
+> **Status (M1):** not implemented. With several panes, raw mouse reports must be translated to the pane under the pointer, so host mouse mirroring is switched off until M4. Terminal text selection works normally in the meantime.
+
 
 - Click a pane to focus it.
 - Drag a border to resize.
@@ -251,7 +257,20 @@ keys:                      # optional overrides
   quit: q
 ```
 
-Validation errors are reported with the line and column. `dozer --check <file>` validates a file without launching anything.
+Validation errors are reported with the line number. `dozer --check <file>` validates a file and prints the resolved layout and panes without launching anything.
+
+**Implemented so far (M1):**
+
+- Top-level keys: `version`, `name`, `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths`, `panes` (list or named map), `min_pane`, `quit_when_all_exited`.
+- Pane keys: `title`, `run`, `exec`, `cwd`, `env`, `shell`, `restart`.
+- A bare string in the pane list is shorthand for `run:`.
+
+Keys from later milestones are accepted but produce a warning in `--check` (they're ignored for now):
+
+- top level: `mouse`, `scrollback`, `status_bar`, `multi_input`, `keys`
+- pane: `readonly`, `group`, `min`
+
+Unknown keys are errors. Working examples ship in `examples/`, and every one is loaded by the test suite.
 
 ## 6. Architecture
 
@@ -321,8 +340,8 @@ These are designed in from the start, even where v1 uses only one implementation
 
 | Milestone | Scope |
 |---|---|
-| **M0 Spike** (Linux ✅, Mac pending) | One pane in full screen, driven through the chosen emulator. Pass criteria: vim, htop, and `less` all work, resize is correct, `cat` of a large file stays smooth. Decide the emulator library and the input approach. |
-| **M1 Layouts** | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`, piped input, borders. |
+| **M0 Spike** ✅ (Mac: basics, cursor fix confirmed; sections 2–3 pending) | One pane in full screen, driven through the chosen emulator. Pass criteria: vim, htop, and `less` all work, resize is correct, `cat` of a large file stays smooth. Decide the emulator library and the input approach. |
+| **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
 | **M2 Control** | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
 | **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, mouse focus/resize/scroll and passthrough. |
@@ -346,6 +365,8 @@ This is a running log of the moments where one choice leads down a distinctly di
 1. Each pane has a minimum size: `min_pane`, default 20×5 cells, which a pane's `min` can override.
 2. The layout solver never shrinks a pane below its minimum. If the terminal is smaller than the layout's total minimum, the solver produces a **virtual canvas** bigger than the screen.
 3. The screen is a **viewport** onto that canvas. It auto-scrolls to keep the focused pane fully visible. `C-a` + `PgUp/PgDn/Home/End`, or the mouse wheel over the border gutter, pans the viewport manually. Scroll indicators (`◀ ▲ ▼ ▶`) show hidden content.
+
+**Implemented in M1:** points 1–5, except manual panning. The viewport follows focus, and the status bar shows `more ◀▲▼▶`.
 4. A pane's PTY size is its layout size, not what's currently visible. Partly hidden panes keep their real size, so programs inside don't reflow while you pan.
 5. Zoom (`C-a z`) still works as a manual escape hatch.
 

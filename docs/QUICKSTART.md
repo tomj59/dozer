@@ -1,125 +1,136 @@
-# dozer quickstart (M0)
+# dozer quickstart
 
-This page teaches you to use dozer as it exists today. When you've finished it, [`M0-CHECKLIST.md`](M0-CHECKLIST.md) is where you record whether it works.
+This page teaches you to use dozer as it exists today (M1: multiple panes). When you've finished it, [`M1-CHECKLIST.md`](M1-CHECKLIST.md) is where you record whether it works.
 
 ## What you're looking at
 
-M0 is the engine test, not the finished tool. Right now dozer shows **one** shell filling your terminal window, with a one-line **status bar** at the bottom. Multiple panes and layouts come in M1.
-
-That single pane is the hard part. dozer runs a real shell on its own pseudo-terminal, emulates that terminal itself, and redraws the result inside your real terminal. If this layer is solid, everything later sits on it. So the job right now is: **does a shell inside dozer feel exactly like a shell outside it?**
+dozer fills your terminal window with several **panes**. Each pane is a real, independent shell (or a command you chose), arranged in rows and columns and separated by thin lines:
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ tomj@mac ~/claude/Projects/tui-multi-shell/dozer %           │ ← your normal shell, running
-│                                                              │   inside dozer
-│                                                              │
-│                                                              │
-│ dozer f7f9ee3 │ emu: charm │ C-a q: quit │ tomj@mac: ~/…     │ ← dozer's status bar
-└──────────────────────────────────────────────────────────────┘
+─ [1] zsh ─────────────────────────┬─ [2] git log ────────────────────────   ← title line of each pane
+tomj@mac ~/dozer %                 │* db5558e Add QUICKSTART …
+                                   │* f7f9ee3 M0 spike …
+                                   │tomj@mac ~/dozer %
+─ [3] zsh ─────────────────────────────────────────────────────────────────
+tomj@mac ~/dozer %
+
+ dozer │ [1] zsh                                       C-a q quit │ 6152094   ← status bar
 ```
 
-The status bar shows:
+- **Title line:** the pane number, its label, and its state when the process has ended. The pane you're typing into (the **focused** pane) has a bright cyan title.
+- **Status bar:** which pane is focused, a red alert when a pane has died, and hints.
 
-- the dozer version
-- the emulator back end in use (`charm` by default)
-- a reminder of how to quit
-- the window title your shell sets, if it sets one
+The default layout is `2,1`: two panes on top, one wide pane below. Every pane starts your shell in the folder you launched from.
 
-## 1. Build it (one time)
-
-In a terminal on your Mac:
+## 1. Build it
 
 ```sh
 cd ~/claude/Projects/tui-multi-shell/dozer
 make              # builds bin/dozer
 ```
 
-`make` uses your Go install. If `make` isn't available, `go build -o bin/dozer ./cmd/dozer` does the same thing.
-
-## 2. Start it and look around
+## 2. Start it and move around
 
 ```sh
 bin/dozer
 ```
 
-The screen clears and you get your normal prompt, with the status bar at the bottom. Now use it like any terminal:
+You get three shells. Typing goes to the focused pane: pane `[1]`, top left. To use the others you need the **prefix key**.
 
-```sh
-ls -G
-echo hello
-cd ..
-```
+### The prefix key: `Ctrl-a`
 
-Nothing about typing, history (↑/↓), tab completion or `Ctrl-c` should feel different.
-
-## 3. The one new idea: the prefix key
-
-A shell inside dozer needs every normal keystroke. So dozer reserves exactly one key, the **prefix**, `Ctrl-a`, and listens for its commands only right after that key.
-
-1. Press and release **`Ctrl-a`**. The status bar changes to **PREFIX** and the cursor hides. dozer is now waiting for one command key.
-2. Press a **command key**:
+Every shell needs every normal keystroke, so dozer reserves exactly one key, **`Ctrl-a`**, and listens for a single command key right after it. The status bar shows **PREFIX** while it waits.
 
 | After `Ctrl-a`, press | What happens |
 |---|---|
-| `q` | **Quit dozer.** The shell inside is closed, and your terminal is back exactly as it was. |
-| `l` (lowercase L) | Redraw the whole screen. Use it if the display ever looks wrong. |
-| `Ctrl-a` again | Send one real `Ctrl-a` to the shell. In zsh or bash that jumps to the start of the line. |
-| `Esc`, an arrow key, or anything else | Cancels; you're back to normal typing. |
+| `→` `←` `↑` `↓` (or `l` `h` `k` `j`) | Focus the pane in that direction |
+| `1` … `9` | Focus pane N |
+| `o` | Focus the next pane |
+| `z` | **Zoom**: the focused pane fills the window. `Ctrl-a z` again restores the layout. |
+| `r` | **Restart** the focused pane's command (works whether it's dead or alive) |
+| `R` | Restart **every dead** pane |
+| `Ctrl-l` | Redraw everything (if the screen ever looks wrong) |
+| `q` | **Quit dozer.** If any pane is still running, it asks first: `y` quits, any other key stays. |
+| `Ctrl-a` | Send one real `Ctrl-a` to the shell (jump to the start of the line) |
+| `Esc` | Cancel |
 
 Try it now:
 
-- `Ctrl-a` then `l` → nothing visible should change. It's a repaint.
-- Type `echo abc`, then `Ctrl-a Ctrl-a` → the cursor jumps to the start of the line.
-- `Ctrl-a` then `q` → dozer exits.
+1. `Ctrl-a` `→` → pane `[2]`'s title turns cyan and your typing goes there.
+2. `Ctrl-a` `↓` → pane `[3]`.
+3. `Ctrl-a` `z` → pane 3 fills the window; `Ctrl-a` `z` again restores the layout.
+4. `Ctrl-a` `q`, then `y` → dozer quits.
 
-That's the entire command set in M0. Everything else goes straight to your shell.
+## 3. Choosing the layout and what runs
 
-## 4. Ways to leave
+### From the command line
 
-| Action | Result |
+| Command | Result |
 |---|---|
-| `Ctrl-a` `q` | Quits dozer. |
-| Type `exit` in the shell | The shell ends, so dozer ends too. (In M0 the pane *is* the session.) |
-| Close the terminal window | Also fine. dozer and its shell are hung up cleanly. |
+| `bin/dozer` | Default `2,1` layout, a shell in each pane |
+| `bin/dozer -l 2,2,1` | Rows of 2, 2 and 1 panes |
+| `bin/dozer -l 3` / `-l 1,3` / `-l 3,3` | Any row pattern, up to 9 panes |
+| `bin/dozer -l 2,1 --heights 70,30` | Top row 70% of the height |
+| `bin/dozer -l 2,1 --widths 1:30,70` | Row 1 split 30% / 70% |
+| `bin/dozer -p top -p 'git log'` | **Run** commands in panes 1, 2, … (you get a prompt when each finishes) |
+| `bin/dozer -x 'tail -f log'` | **Exec**: the pane *is* the command; when it ends, the pane is dead (§4) |
+| `bin/dozer -p a -p b -p c -p d` | No `-l`: the layout is fitted to the commands (4 → `2,2`) |
+| `printf 'top\ngit status\n' \| bin/dozer` | Piped: one pane command per line |
+| `bin/dozer --prefix C-b` | Use `Ctrl-b` as the prefix instead |
 
-If a command exits with an error code, dozer prints `dozer: pane exited with status N` after it closes. That's information, not a crash.
+Sizes accept `60` or `60%` (percent), `12c` (fixed rows or columns) and `2fr` (a share of what's left).
 
-## 5. Starting dozer with a command
+### From a config file (YAML)
 
-These are the M0 flags:
+The folder `examples/` has ready-made configs, and each one explains itself at the top:
 
-| Command | What it does |
+| File | Shows |
 |---|---|
-| `bin/dozer` | Your login shell (`$SHELL`) in the pane |
-| `bin/dozer -p top` | **Run** `top` in your shell; when you quit `top` (`q`), you're left at a shell prompt inside dozer |
-| `bin/dozer -x top` | **Exec** `top`: `top` *is* the pane, so quitting `top` also exits dozer |
-| `bin/dozer -emu vt10x` | Same as `bin/dozer`, using the alternative emulator (for comparison only) |
-| `bin/dozer -version` | Print the version and exit |
-| `bin/dozer -h` | List the flags |
+| `reference.yaml` | Every key, with defaults (same as a bare `dozer`) |
+| `dev.yaml` | A coding workspace: shell, git log, an auto-restarting clock |
+| `monitor.yaml` | The `2,2,1` layout full of live output |
+| `tree.yaml` | The tree form: a tall left pane with two stacked on the right |
+| `lifecycle.yaml` | Panes that die in different ways, to see dead-pane handling |
+| `ssh.yaml` | A template for watching servers (edit the hosts first) |
 
-Quote commands that contain spaces: `bin/dozer -p 'tail -f /var/log/system.log'`.
+```sh
+bin/dozer -c examples/dev.yaml
+bin/dozer --check examples/tree.yaml    # validate + show what would launch, without launching
+```
 
-The difference between `-p` and `-x` is the same one you'll later write in YAML as `run:` and `exec:`. `-p` is for "start this, and leave me a shell afterwards". `-x` is for "this pane only exists to show this command".
+To reuse a config as a **profile**, copy it to `~/.config/dozer/NAME.yaml` and run `dozer NAME`. A `.dozer.yaml` in the current folder, or `~/.config/dozer/config.yaml`, is loaded automatically by a bare `dozer`.
 
-## 6. Things that are *expected* in M0 (not bugs)
+## 4. When a pane's process ends
 
-- **One pane only.** Layouts, pane switching and multi-input come in M1 and later.
-- **No scrollback.** Output that scrolls off the top is gone for now. The scroll wheel may even cycle through shell history, because in full-screen mode many terminals turn the wheel into ↑/↓ key presses. Scrollback arrives in M4.
-- **`Cmd-K` (clear) in Terminal/iTerm2.** It wipes the host screen behind dozer's back, so parts may stay blank until they change. Press `Ctrl-a` `l` to repaint, or use `clear` instead.
-- **Option key as Meta.** Word-jumping with Option-b/f works only if your terminal sends Option as Meta, exactly as without dozer:
+A pane is a **permanent slot**. When its process exits or crashes, the layout does *not* change. Instead the pane is flagged:
+
+- Its title shows the state: `exited` (dimmed, status 0), `✖ exit 3` or `✖ SIGKILL` (red), or `✖ connection lost` (an `-x`/`exec:` ssh pane that exited 255).
+- Its last output stays visible but dimmed, with a banner along its bottom edge: `✖ exit 3 at 14:02:31 · C-a r restart`.
+- The status bar shows a red `✖ N dead · C-a R`, even when that pane is zoomed out of view.
+
+**Bringing it back is your call:** `Ctrl-a r` (focused pane) or `Ctrl-a R` (all dead panes) re-runs the pane's original command in the same spot. A config can opt a pane into automatic restarts with `restart: on-failure` or `restart: always`. Restarts back off (1 s, 2 s, 4 s … up to 30 s) if the command keeps failing.
+
+dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has died. (`--quit-when-all-exited` changes that.)
+
+## 5. Expected for now (not bugs)
+
+- **No mouse yet.** Clicking doesn't focus panes and apps like htop don't receive clicks until M4. Your terminal's own text selection still works.
+- **No scrollback.** Output that scrolls off the top of a pane is gone for now (M4). The scroll wheel may cycle shell history instead.
+- **No resizing of splits at runtime yet** (`Ctrl-a H/J/K/L` comes later). Set sizes at launch with `--heights`/`--widths` or the config.
+- **A window that's too small** keeps panes at a minimum size and scrolls the view to the focused pane. The status bar shows `more ◀ ▶` when part of the layout is off-screen.
+- **Option key as Meta** depends on your terminal setting, just as without dozer:
   - Terminal.app: Settings → Profiles → Keyboard → "Use Option as Meta key"
   - iTerm2: Profiles → Keys → Left Option key: Esc+
-- **The status bar costs one row.** `stty size` reports one row less than your window.
 
-## 7. If something goes wrong
+## 6. If something goes wrong
 
 | Symptom | Try |
 |---|---|
-| The display looks garbled | `Ctrl-a` `l` |
-| Keys seem dead | Look at the status bar. If it says **PREFIX**, dozer is waiting for a command key; press `Esc` to cancel. |
-| dozer is stuck and won't quit | From another terminal: `pkill dozer` |
-| Your terminal is weird after dozer exits (no echo, odd colors) | Type `reset` and press Enter, even if you can't see it. **Also report it: that's a bug.** |
+| The display looks garbled | `Ctrl-a` `Ctrl-l` |
+| Keys seem dead | Look at the status bar. **PREFIX** means dozer is waiting (press `Esc`); "Quit dozer?" is waiting for `y` or another key. Or the focused pane is dead: check its title. |
+| dozer is stuck | From another terminal: `pkill dozer` |
+| Your terminal is weird after dozer exits | Type `reset` + Enter, and please report it: that's a bug |
 
-## 8. Now test it
+## 7. Now test it
 
-Open [`M0-CHECKLIST.md`](M0-CHECKLIST.md) and work through it with the steps above. For anything that seems off, a screenshot plus the terminal app name (Terminal, iTerm2, Ghostty, …) is the most useful report.
+Work through [`M1-CHECKLIST.md`](M1-CHECKLIST.md). For anything off, a screenshot plus the terminal app name is the most useful report.

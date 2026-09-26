@@ -1,0 +1,28 @@
+# tree.yaml: the full tree form for layouts the shorthand can't express.
+# Here: a tall editor column on the left, two stacked panes on the right.
+#
+#   ┌──────── edit ────────┬──── logs ────┐
+#   │                      │              │
+#   │  (60% wide)          ├──── shell ───┤
+#   │                      │  (12 rows)   │
+#   └──────────────────────┴──────────────┘
+#
+# Nodes: {rows: [...]} stacks children, {cols: [...]} places them side by side,
+# {pane: name} is a pane slot. Any node takes size: 60% | 12c | 2fr.
+#   dozer -c examples/tree.yaml
+name: tree
+layout:
+  cols:
+    - pane: edit
+      size: 60%
+    - rows:
+        - pane: logs
+        - pane: shell
+          size: 12c
+panes:                     # keyed by the names used in the layout
+  edit:
+    run: ls -la
+  logs:
+    exec: 'while true; do date; sleep 2; done'
+    restart: on-failure
+  shell: {}                # title defaults to the name ("shell")

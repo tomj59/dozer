@@ -1,0 +1,16 @@
+# monitor.yaml: the alternative 2,2,1 layout, filled with things that keep
+# producing output. Good for watching several panes update at once.
+#
+#   dozer -c examples/monitor.yaml
+name: monitor
+layout: "2,2,1"
+panes:
+  - title: top
+    exec: top
+  - title: disk
+    exec: 'while true; do clear; df -h | head -12; sleep 5; done'
+  - title: ping
+    exec: ping 127.0.0.1
+  - title: counter
+    exec: 'i=0; while true; do i=$((i+1)); echo "line $i"; sleep 0.2; done'
+  - title: shell

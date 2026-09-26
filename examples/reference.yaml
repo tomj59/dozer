@@ -1,0 +1,36 @@
+# reference.yaml: every key dozer understands today, with its default.
+# Running it gives the same result as a bare `dozer`.
+#
+#   dozer -c examples/reference.yaml
+#   dozer --check examples/reference.yaml   # validate and print, don't launch
+
+version: 1
+name: reference
+
+# Defaults inherited by every pane (each pane can override them).
+shell: ""        # "" = your $SHELL
+cwd: ""          # "" = where you launched dozer; ~ and $VARS expand;
+                 # relative paths resolve against this file's folder
+env: {}          # extra environment variables, e.g. { STAGE: dev }
+
+prefix: C-a      # the command key: C-a … C-z
+min_pane: { w: 20, h: 5 }    # smallest pane content; a smaller window scrolls (DP-1)
+quit_when_all_exited: false  # true = quit dozer once every pane has exited
+
+# Layout shorthand: panes per row, top to bottom. "2,1" = two on top, one wide below.
+layout: "2,1"
+heights: [50, 50]            # per-row height: 60 or 60% (percent), 12c (cells), 2fr (weight)
+widths:  { 1: [50, 50] }     # per-row widths, keyed by row number (1 = top)
+
+# Panes in reading order (left→right, top→bottom). Missing panes get a plain shell.
+panes:
+  - {}                       # [1] plain shell
+  - {}                       # [2] plain shell
+  - {}                       # [3] plain shell
+# A pane can set:
+#   title:   "API"             label on its divider (default: the command)
+#   run:     "git status"      run in your shell, then leave you at a prompt
+#   exec:    "tail -F app.log" the pane IS this command; it ends when the command ends
+#   cwd, env, shell            per-pane overrides
+#   restart: never | on-failure | always   (exec panes only; auto-restart with back-off)
+# A bare string is shorthand for run:, e.g.  - "git log --oneline -20"

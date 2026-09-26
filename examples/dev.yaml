@@ -1,0 +1,18 @@
+# dev.yaml: a coding workspace in the default 2,1 layout.
+#
+#   ┌────────── shell ─────────┬──────── git ─────────┐
+#   │ your prompt              │ git log, then prompt │
+#   ├────────────────── clock (auto-restarts) ────────┤
+#   └─────────────────────────────────────────────────┘
+#
+#   dozer -c examples/dev.yaml
+name: dev
+layout: "2,1"
+heights: [70, 30]          # give the top row more room
+panes:
+  - title: shell
+  - title: git
+    run: git log --oneline --graph --decorate -15
+  - title: clock
+    exec: 'while true; do printf "\r%s  (Ctrl-a r restarts me)" "$(date +%T)"; sleep 1; done'
+    restart: always

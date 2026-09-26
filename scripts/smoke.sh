@@ -1,40 +1,49 @@
 #!/usr/bin/env bash
-# Headless end-to-end checks: runs bin/dozer inside a detached tmux session
-# and inspects the rendered screen. Linux/macOS, needs tmux and vim.
-set -euo pipefail
+# Headless end-to-end checks: runs bin/dozer inside detached tmux sessions
+# and inspects the rendered screen. Linux/macOS; needs tmux and vim.
+set -uo pipefail
 cd "$(dirname "$0")/.."
-make build >/dev/null
+make build >/dev/null || exit 1
 EMU=${EMU:-charm}
-S=dozer-smoke-$$
+export LANG=${LANG:-C.UTF-8}
+BASE=dozer-smoke-$$
+S=$BASE
 fail=0
-trap 'tmux kill-session -t $S 2>/dev/null || true' EXIT
+cleanup() { for s in $BASE $BASE-1 $BASE-q; do tmux kill-session -t "$s" 2>/dev/null; done; }
+trap cleanup EXIT
 
-send() { tmux send-keys -t "$S" "$@"; sleep 0.6; }
-screen() { tmux capture-pane -t "$S" -p; }
-check() { # name, grep pattern
-  if screen | grep -q -- "$2"; then echo "ok   $1"; else echo "FAIL $1"; screen; fail=1; fi
+start() { # session, width, height, dozer args...
+  local s=$1 w=$2 h=$3; shift 3
+  tmux new-session -d -s "$s" -x "$w" -y "$h" "env SHELL=/bin/bash PS1='$ ' bin/dozer -emu $EMU $*"
+  sleep 1.5
 }
+send() { tmux send-keys -t "$S" "$@"; sleep 0.5; }
+screen() { tmux capture-pane -t "$S" -p; }
+ok() { echo "ok   $1"; }
+bad() { echo "FAIL $1"; fail=1; }
+check() { # name, grep pattern
+  if screen | grep -q -- "$2"; then ok "$1"; else bad "$1"; screen; fi
+}
+cursor_is() { # name, expected column
+  local got; got=$(tmux display -p -t "$S" '#{cursor_x}')
+  if [ "$got" = "$2" ]; then ok "$1"; else bad "$1: cursor_x=$got want $2"; fi
+}
+quit() { send C-a q; send y; sleep 0.3; }
 
-tmux new-session -d -s "$S" -x 100 -y 30 "env SHELL=/bin/bash PS1='$ ' bin/dozer -emu $EMU"
-sleep 1.2
-check "status bar" "dozer .* emu: $EMU"
+# --- default layout, 3 panes --------------------------------------------
+start $S 110 32
+check "three pane titles" "─ \[3\]"
+check "status bar" "│ \[1\] bash"
 
 send 'printf "\e[31mred\e[0m wide:日本語 end\n"' Enter
 check "output + wide chars" "red wide:日本語 end"
 
 send 'vim -u NONE -N README.md' Enter
 sleep 0.5
-check "vim alt screen" "^# dozer"
-send j j Down x
-send Escape ':q!' Enter
+check "vim alt screen" "# dozer"
+send j j Down x Escape ':q!' Enter
 check "back from alt screen" "red wide"
 
-# Cursor must track line editing with no lag (regression: the host cursor
-# trailed the pane cursor by one frame).
-cursor_is() { # name, expected column
-  local got; got=$(tmux display -p -t "$S" '#{cursor_x}')
-  if [ "$got" = "$2" ]; then echo "ok   $1"; else echo "FAIL $1: cursor_x=$got want $2"; fail=1; fi
-}
 send C-u 'echo abcdef'
 end=$(tmux display -p -t "$S" '#{cursor_x}')
 send Left
@@ -48,23 +57,64 @@ send C-u
 
 send C-a
 check "prefix pending shown" "PREFIX"
-send C-a
+send Escape
+check "Esc cancels prefix" "│ \[1\] bash"
+send C-a C-a
 send 'echo literal-ok' Enter
 check "C-a C-a literal" "literal-ok"
 
-send C-a l
-check "C-a l redraw keeps screen" "literal-ok"
+send C-a Right
+send 'echo marker-two' Enter
+if screen | grep -q "│.*marker-two"; then ok "C-a → focuses right pane"; else bad "C-a → focuses right pane"; screen; fi
+send C-a Down
+send 'echo marker-three' Enter
+if screen | grep -q "^marker-three"; then ok "C-a ↓ focuses bottom pane"; else bad "C-a ↓ focuses bottom pane"; screen; fi
+send C-a 1
+check "C-a 1 focuses pane 1" "│ \[1\] bash"
 
-tmux resize-window -t "$S" -x 70 -y 20
-sleep 0.6
-send 'stty size' Enter
-check "resize reaches child" "^19 70"
+send C-a z
+check "zoom" "(zoomed)"
+send C-a z
+check "unzoom" "─ \[3\]"
+
+send C-a C-l
+check "C-a C-l redraw keeps screen" "marker-two"
 
 send 'time seq 1 200000' Enter
 sleep 3
 check "flood finishes" "^real"
 
 send C-a q
+check "quit asks when panes run" "Quit dozer?"
+send n
+check "declining keeps dozer" "│ \[1\] bash"
+quit
+if tmux has-session -t "$S" 2>/dev/null; then bad "C-a q y quits"; else ok "C-a q y quits"; fi
+
+# --- one pane: sizes reach the child -------------------------------------
+S=$BASE-1
+start $S 70 20 -l 1
+send 'stty size' Enter
+check "pty size = window - title - status" "^18 70"
+tmux resize-window -t "$S" -x 60 -y 15
+sleep 0.6
+send 'stty size' Enter
+check "resize reaches child" "^13 60"
+quit
+
+# --- dead panes ----------------------------------------------------------
+S=$BASE-q
+start $S 90 24 -l 2 -x "'echo bye; exit 3'"
 sleep 0.5
-if tmux has-session -t "$S" 2>/dev/null; then echo "FAIL C-a q quits"; fail=1; else echo "ok   C-a q quits"; fi
+check "failed pane flagged" "✖ exit 3"
+check "dead count in status bar" "1 dead"
+send C-a 2
+send C-a r
+check "restart flash" "restarted \[2\]"
+send 'exit' Enter
+sleep 0.5
+if tmux has-session -t "$S" 2>/dev/null; then ok "dozer stays when panes exit"; else bad "dozer stays when panes exit"; fi
+check "exited pane flagged" "exited"
+quit
+
 exit $fail

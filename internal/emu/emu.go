@@ -85,3 +85,13 @@ func New(name string, cols, rows int) (Emulator, error) {
 	}
 	return nil, fmt.Errorf("unknown emulator %q (have %v)", name, Names)
 }
+
+// MustNew is New for back-end names already validated; it falls back to the
+// default back end rather than failing.
+func MustNew(name string, cols, rows int) Emulator {
+	e, err := New(name, cols, rows)
+	if err != nil {
+		e = newCharm(cols, rows)
+	}
+	return e
+}

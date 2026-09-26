@@ -2,7 +2,7 @@
 
 A TUI multi-shell for Linux and macOS: one terminal window holding several live shells in a row/column layout, each set up at launch by flags, piped commands or a YAML file.
 
-> **Status: M0 spike.** One full-screen pane is used to validate terminal emulation, input passthrough and rendering. Layouts arrive in M1. See [`docs/SPEC.md`](docs/SPEC.md) for the full design and roadmap.
+> **Status: M1.** Multiple panes in rows/columns, focus and zoom, dead-pane handling, and YAML configs. See [`docs/SPEC.md`](docs/SPEC.md) for the design and roadmap.
 
 **New here? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md).**
 
@@ -16,28 +16,33 @@ make test       # vet + tests
 make dist       # cross-compiles dist/dozer-{darwin,linux}-{arm64,amd64}
 ```
 
-## Try the M0 spike
+## Try it
 
 ```sh
-bin/dozer                    # your $SHELL in one pane
-bin/dozer -p htop            # run htop, drop to a prompt when it exits
-bin/dozer -x 'tail -f log'   # the pane IS the command
-bin/dozer -emu vt10x         # A/B: the alternative emulator back end
+bin/dozer                          # default 2,1 layout: two panes on top, one below
+bin/dozer -l 2,2,1                 # five panes
+bin/dozer -p htop -p 'git log'     # run commands in panes 1, 2 … then leave a prompt
+bin/dozer -x 'tail -f log'         # the pane IS the command
+bin/dozer -c examples/dev.yaml     # a YAML config; see examples/
+bin/dozer --check examples/tree.yaml
 ```
 
-Prefix key: **Ctrl-a**. `Ctrl-a q` quits, `Ctrl-a l` redraws, `Ctrl-a Ctrl-a` sends a literal Ctrl-a, and `Esc` cancels a pending prefix.
+Prefix key: **Ctrl-a**, then: arrows/hjkl/1-9/o to focus, `z` zoom, `r`/`R` restart, `Ctrl-l` redraw, `q` quit, `Esc` cancel.
 
 ## Layout of the code
 
 | Path | What |
 |---|---|
 | `cmd/dozer` | CLI entry point |
-| `internal/app` | Wires host terminal, input and panes; render loop |
+| `internal/app` | Event loop, focus/zoom, compositor, chrome |
+| `internal/layout` | Layout shorthand, tree, and solver |
+| `internal/config` | YAML config, profiles, `--check` |
 | `internal/host` | Raw mode, alt screen, size, mode mirroring |
 | `internal/input` | Prefix-key router over raw bytes (bracketed-paste aware) |
 | `internal/pane` | PTY + child process + emulator |
 | `internal/emu` | Emulator adapter (charm vt, vt10x) and benchmarks |
 | `third_party/vt` | Patched fork of `charmbracelet/x/vt`; see `DOZER_PATCHES.md` |
+| `examples/` | Example configs (all loaded by the tests) |
 | `scripts/smoke.sh` | Headless end-to-end checks inside tmux |
 
 ## License
