@@ -137,3 +137,28 @@ func TestSaveAfterResize(t *testing.T) {
 		t.Errorf("reloaded width %d, want 60", s[0].W)
 	}
 }
+
+// Every packaged manual test case must load cleanly, be named after its
+// file, and carry a description (the guide pane shows it).
+func TestManualCases(t *testing.T) {
+	files, _ := filepath.Glob("../../tests/cases/*.sh")
+	if len(files) == 0 {
+		t.Fatal("no test cases found")
+	}
+	for _, f := range files {
+		c, err := Load(f)
+		if err != nil {
+			t.Errorf("%s: %v", f, err)
+			continue
+		}
+		if want := strings.TrimSuffix(filepath.Base(f), ".sh"); c.Name != want {
+			t.Errorf("%s: name %q, want %q", f, c.Name, want)
+		}
+		if !strings.HasPrefix(c.Description, strings.SplitN(c.Name, "-", 2)[0]+": ") {
+			t.Errorf("%s: description should start with its ID", f)
+		}
+		if len(c.Warnings) > 0 {
+			t.Errorf("%s: warnings %v", f, c.Warnings)
+		}
+	}
+}

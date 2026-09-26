@@ -153,4 +153,12 @@ dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has die
 
 ## 7. Now test it
 
+Every test is also a ready-to-run script in [`tests/cases/`](../tests/cases/README.md). Each one sets up exactly its scenario and shows its own steps and expected result in pane 1:
+
+```sh
+make install              # once: dozer on your PATH (default /usr/local/bin; PREFIX=~/.local also works)
+tests/cases/K03-resize.sh
+```
+
+
 Work through [`M1-CHECKLIST.md`](M1-CHECKLIST.md). For anything off, a screenshot plus the terminal app name is the most useful report.

@@ -6,6 +6,8 @@
 
 version: 1
 name: reference
+description: |      # free text; shown by --check and to panes as $DOZER_DESCRIPTION
+  Every key dozer understands, with defaults.
 
 # Defaults inherited by every pane (each pane can override them).
 shell: ""        # "" = your $SHELL

@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.11 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.12 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -324,7 +324,7 @@ Validation errors are reported with the line number. `dozer --check <file>` vali
 
 **Implemented so far (M1):**
 
-- Top-level keys: `version`, `name`, `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths` (sizes also accept `auto`), `panes` (list or named map), `min_pane`, `quit_when_all_exited`, `status_bar` (M2).
+- Top-level keys: `version`, `name`, `description` (free text: shown by `--check`, in package headers, and to every pane as `$DOZER_DESCRIPTION`), `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths` (sizes also accept `auto`), `panes` (list or named map), `min_pane`, `quit_when_all_exited`, `status_bar` (M2).
 - Pane keys: `title`, `run`, `exec`, `cwd`, `env`, `shell`, `restart`.
 - A bare string in the pane list is shorthand for `run:`.
 
@@ -378,7 +378,7 @@ Input fidelity (decided in M0, DP-2): the prefix state machine sees raw input by
 
 Bracketed-paste content is never scanned for the prefix. Mouse reports will need translating from screen to pane coordinates once there's more than one pane (M1/M4).
 
-Environment for child processes: `TERM=xterm-256color`, `COLORTERM=truecolor`, `DOZER=1`, `DOZER_PANE=<id>`.
+Environment for child processes: `TERM=xterm-256color`, `COLORTERM=truecolor`, `DOZER=1`, `DOZER_PANE=<id>`, `DOZER_NAME`, `DOZER_DESCRIPTION`.
 
 ## 7. Extensibility points
 
@@ -413,6 +413,7 @@ These are designed in from the start, even where v1 uses only one implementation
 | **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
 | **Deferred** | `C-a S` runtime save of sizes, titles and status bar. Revisit after functional review. |
 | **M6 Ship** | goreleaser, Homebrew tap, `dozer --help`/man page, example configs. |
+| **Manual test cases** ✅ | `tests/cases/*.sh`: one packaged workspace per test case, with a guide pane that shows its steps and expectations; indexed in `tests/cases/README.md`, validated by `make cases` and the unit tests. |
 | **Functional review** | Try the small-terminal behavior (DP-1) and multi-input ergonomics with real use, then adjust. |
 | **Styles** (after M5) | Pane styles and chrome themes (§4.11, DP-5): built-in named styles, inline colors, OSC color query replies, per-focus cursor color. |
 | **Later** | Pane output logging, control socket (`dozer send`), detach via a client/server split, and possibly runtime split/close. |

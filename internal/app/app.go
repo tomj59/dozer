@@ -88,6 +88,10 @@ func Run(cfg *config.Config, o Options) (err error) {
 
 	// Build the permanent pane slots, then size and start them.
 	for i, spec := range cfg.Panes {
+		// Every pane can see which workspace it belongs to (e.g. a guide
+		// pane can print $DOZER_DESCRIPTION).
+		spec.Env = append(append([]string(nil), spec.Env...),
+			"DOZER_NAME="+cfg.Name, "DOZER_DESCRIPTION="+cfg.Description)
 		a.panes = append(a.panes, pane.New(i+1, spec, o.Emulator, 80, 24, a.mark))
 	}
 	defer func() {

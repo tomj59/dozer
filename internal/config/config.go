@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -22,6 +23,7 @@ import (
 // build the session.
 type Config struct {
 	Name              string
+	Description       string // free text: what this workspace (or test case) is for
 	Source            string // file it came from, "" if flags only
 	Layout            *layout.Node
 	Panes             []pane.Spec // indexed by pane number (reading order)
@@ -37,13 +39,14 @@ type Config struct {
 type file struct {
 	Version           int                 `yaml:"version"`
 	Name              string              `yaml:"name"`
+	Description       string              `yaml:"description"`
 	Shell             string              `yaml:"shell"`
 	Cwd               string              `yaml:"cwd"`
 	Env               map[string]string   `yaml:"env"`
 	Prefix            string              `yaml:"prefix"`
 	Layout            yaml.Node           `yaml:"layout"`
 	Heights           []string            `yaml:"heights"`
-	Widths            map[int][]string    `yaml:"widths"`
+	Widths            map[string][]string `yaml:"widths"` // row number → sizes
 	Panes             yaml.Node           `yaml:"panes"`
 	MinPane           *struct{ W, H int } `yaml:"min_pane"`
 	QuitWhenAllExited bool                `yaml:"quit_when_all_exited"`
@@ -110,6 +113,7 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 	}
 	c := Defaults()
 	c.Name = f.Name
+	c.Description = strings.TrimRight(f.Description, "\n")
 
 	for key, n := range map[string]*yaml.Node{"mouse": &f.Mouse, "scrollback": &f.Scrollback,
 		"multi_input": &f.MultiInput, "keys": &f.Keys} {
@@ -353,7 +357,7 @@ func parseTree(n *yaml.Node, names map[string]int) (*layout.Node, error) {
 	return out, nil
 }
 
-func applySizes(root *layout.Node, heights []string, widths map[int][]string) error {
+func applySizes(root *layout.Node, heights []string, widths map[string][]string) error {
 	if len(heights) > 0 {
 		sz, err := parseList(heights)
 		if err != nil {
@@ -363,7 +367,11 @@ func applySizes(root *layout.Node, heights []string, widths map[int][]string) er
 			return err
 		}
 	}
-	for row, list := range widths {
+	for key, list := range widths {
+		row, err := strconv.Atoi(key)
+		if err != nil {
+			return fmt.Errorf("widths: row %q is not a number", key)
+		}
 		sz, err := parseList(list)
 		if err != nil {
 			return fmt.Errorf("widths: %w", err)
@@ -482,6 +490,11 @@ func (c *Config) Describe() string {
 	fmt.Fprintf(&b, "config: %s\n", src)
 	if c.Name != "" {
 		fmt.Fprintf(&b, "name:   %s\n", c.Name)
+	}
+	if c.Description != "" {
+		for _, line := range strings.Split(c.Description, "\n") {
+			fmt.Fprintf(&b, "  | %s\n", line)
+		}
 	}
 	fmt.Fprintf(&b, "prefix: C-%c   min pane: %dx%d   status bar: %s   quit when all exited: %v\n", 'a'+c.Prefix-1, c.MinPane.W, c.MinPane.H, c.StatusBar, c.QuitWhenAllExited)
 	fmt.Fprintf(&b, "layout: %s\n", describeNode(c.Layout))

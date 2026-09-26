@@ -43,6 +43,11 @@ func (c *Config) YAML(header string) ([]byte, error) {
 	if c.Name != "" {
 		add("name", str(c.Name))
 	}
+	if c.Description != "" {
+		d := str(c.Description + "\n")
+		d.Style = yaml.LiteralStyle
+		add("description", d)
+	}
 	def := Defaults()
 	if c.Prefix != def.Prefix {
 		add("prefix", str(fmt.Sprintf("C-%c", 'a'+c.Prefix-1)))

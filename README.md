@@ -14,6 +14,8 @@ Requires Go 1.24+.
 make            # builds bin/dozer for this machine
 make test       # vet + tests
 make dist       # cross-compiles dist/dozer-{darwin,linux}-{arm64,amd64}
+make install    # copies bin/dozer to /usr/local/bin (PREFIX=~/.local for your home)
+make cases      # validates the manual test cases in tests/cases/
 ```
 
 ## Try it
@@ -44,6 +46,7 @@ Prefix key: **Ctrl-a**, then: arrows/hjkl/1-9/o to focus, `z` zoom, `H J K L` re
 | `internal/emu` | Emulator adapter (charm vt, vt10x) and benchmarks |
 | `third_party/vt` | Patched fork of `charmbracelet/x/vt`; see `DOZER_PATCHES.md` |
 | `examples/` | Example configs (all loaded by the tests) |
+| `tests/cases/` | Manual test cases, one packaged script each; see its README |
 | `scripts/smoke.sh` | Headless end-to-end checks inside tmux |
 
 ## License

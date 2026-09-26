@@ -61,7 +61,7 @@ func (c *Config) Package(name, version, date string) ([]byte, error) {
 #   dozer -c %[1]s.yaml --package %[1]s.sh
 #
 # Needs dozer on your PATH (or DOZER_BIN=/path/to/dozer): https://github.com/tomj59/dozer
-
+%[7]s
 yaml() {
 %[4]s
 %[5]s%[6]s
@@ -84,8 +84,21 @@ fi
 
 # Run: config on stdin; dozer reads the keyboard from the terminal.
 yaml | "$dozer" -c - "$@"
-`, name, version, date, yamlOpen, body, yamlClose)
+`, name, version, date, yamlOpen, body, yamlClose, commentBlock(c.Description))
 	return []byte(b.String()), nil
+}
+
+// commentBlock renders the description as a shell comment block.
+func commentBlock(desc string) string {
+	if desc == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("#\n")
+	for _, line := range strings.Split(desc, "\n") {
+		b.WriteString(strings.TrimRight("# "+line, " ") + "\n")
+	}
+	return b.String()
 }
 
 // Unpack extracts the YAML embedded in a packaged script.
