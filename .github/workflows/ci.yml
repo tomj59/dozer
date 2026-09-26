@@ -1,0 +1,53 @@
+# CI: unit tests, test-case validation and headless end-to-end checks on
+# Linux and macOS, plus cross-compiled binaries as downloadable artifacts.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install tmux and vim (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y tmux vim locales && sudo locale-gen en_US.UTF-8
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
+      - name: Vet and unit tests
+        run: make test && go test -race ./...
+      - name: Validate test cases
+        run: make cases
+      - name: End-to-end smoke (headless tmux)
+        # Timing-based; retry once to ride out a slow runner.
+        run: ./scripts/smoke.sh || ./scripts/smoke.sh
+
+  dist:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # version string from git describe
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dozer-binaries
+          path: dist/
