@@ -136,6 +136,7 @@ dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has die
 ## 5. Expected for now (not bugs)
 
 - **No mouse yet.** Clicking doesn't focus panes and apps like htop don't receive clicks until M4. Your terminal's own text selection still works.
+- **Copying text with the mouse spans panes.** Your terminal's selection doesn't know about panes, so it grabs whole rows, neighbors and dividers included. For now, zoom the pane first (`Ctrl-a z`), or use rectangular selection: ⌥ Option-drag in Terminal.app, ⌘⌥-drag in iTerm2. Pane-aware copy comes in M4 (DP-8).
 - **No scrollback.** Output that scrolls off the top of a pane is gone for now (M4). The scroll wheel may cycle shell history instead.
 - **A window that's too small** keeps panes at a minimum size and scrolls the view to the focused pane. The status bar shows `more ◀ ▶` when part of the layout is off-screen.
 - **Option key as Meta** depends on your terminal setting, just as without dozer:

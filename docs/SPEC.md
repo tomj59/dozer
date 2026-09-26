@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.14 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.15 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -410,7 +410,7 @@ These are designed in from the start, even where v1 uses only one implementation
 | **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
 | **M2 Control** (Linux ✅, Mac pending) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
-| **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, **resize reflow (DP-7)**, mouse focus/resize/scroll and passthrough. |
+| **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
 | **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
 | **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
@@ -544,6 +544,27 @@ A version pin is also worth considering: the script records the dozer version th
 This is a change inside the emulator (`third_party/vt`: wrap flag on lines, and reflow in `Screen.Resize` plus `Scrollback`), with no change to the adapter interface. Doing it together with M4 avoids building the scrollback storage twice.
 
 **Alternative rejected:** keeping each line's cut-off tail and pasting it back on grow. It's cheap, but it goes wrong as soon as the program writes to those rows at the narrower width, and it doesn't rewrap anything.
+
+### DP-8 · Who owns text selection (found in E05)
+
+**Status:** decided; build it in M4 with copy mode and the mouse.
+
+**Symptom:** selecting text with the host terminal's mouse runs across pane boundaries. A selection covers whole rows of the dozer window, including the neighboring pane and the `│` divider, and copying or pasting it carries all of that along. This can't be fixed from inside dozer while the host terminal does the selecting: the host sees one grid of text and knows nothing about panes. tmux and screen have the same limit. (Bracketed paste itself worked: indentation arrived intact.)
+
+**Decision:** dozer does the selecting, and it's confined to a pane.
+
+1. **Copy mode** (`C-a [`): keyboard selection within the focused pane, including its scrollback.
+2. **Mouse selection** (M4): dozer takes mouse reporting from the host. Click-drag selects inside the pane under the pointer only, and stops at its edges.
+3. **Clipboard:** a completed selection is written to the system clipboard with **OSC 52**. That works in Terminal.app, iTerm2, kitty, WezTerm, Ghostty and Alacritty, and over ssh. Selections copy *logical* lines (DP-7), so a soft-wrapped line copies as one line.
+4. **Escape hatch:** holding the terminal's override modifier (Shift in most terminals, Option or Fn in some) still gives the host's native selection, for anyone who wants whole rows.
+
+This settles the tradeoff raised earlier: when dozer takes the mouse, host selection needs a modifier. Since host selection is wrong in a multi-pane window anyway, dozer owning selection is the better default. `mouse: false` keeps the host's behavior for anyone who prefers it.
+
+**Interim workaround (until M4):** use the terminal's rectangular selection to stay within a pane:
+- Terminal.app: hold ⌥ Option while dragging.
+- iTerm2: hold ⌘ + ⌥ while dragging.
+
+Or zoom the pane first (`C-a z`).
 
 ## 11. Risks
 
