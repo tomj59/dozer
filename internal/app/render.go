@@ -25,6 +25,8 @@ func (v *view) reset(w, h int) {
 	v.canvas = uv.NewScreenBuffer(w, h)
 }
 
+// Chrome colors. DP-5: these become named tokens of a chrome theme
+// (docs/SPEC.md §4.11); keep all chrome styling going through them.
 var (
 	colDim     color.Color = ansi.BasicColor(8)  // bright black: dividers
 	colFocus   color.Color = ansi.BasicColor(14) // bright cyan: focused title

@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.7 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.8 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -213,6 +213,32 @@ When a pane dies:
 
 > **M0 note:** the spike still quits when its single shell exits. This section is implemented in M2.
 
+### 4.11 Styles and themes (planned)
+
+**Goal:** each pane can look like a different terminal profile, for example pane 1 in a green-on-black "Homebrew" style and pane 2 in "Classic" black-on-white. The chrome (dividers, titles, the status bar and dead-pane signals) has a theme of its own.
+
+There are two levels:
+
+| Level | Controls | Example YAML |
+|---|---|---|
+| **Pane style** | Default foreground and background, the 16-color ANSI palette, cursor color, bold-as-bright | `panes: [{style: homebrew}, {style: classic}]` or inline `style: {fg: "#28fe14", bg: "#000000"}` |
+| **Chrome theme** | Divider, title, focused-title, dead-pane (exited/failed) colors, banner, status bar | `theme: {focus: cyan, failed: red, …}` |
+
+Built-in pane styles would be named after familiar looks (`homebrew`, `classic`, `pro`, `solarized-dark` …) using dozer's own palette values. The default style is "inherit": the host terminal's own colors, which is today's behavior.
+
+**How it would work (DP-5):**
+
+- dozer rewrites colors when it composes the frame; programs in the pane don't know about the style.
+- Cells with no explicit color get the pane's fg/bg.
+- ANSI colors 0–15 are remapped through the pane's palette.
+- 256-color and 24-bit colors pass through unchanged, as terminals do.
+- The emulator answers color queries (OSC 10/11/4) with the pane's style, so programs that detect light or dark backgrounds (vim, bat, delta) adapt per pane.
+- The cursor color follows the focused pane (OSC 12 on focus change).
+
+**Dead-pane signals stay readable on any style.** Exited and failed markers are chrome-theme colors drawn on the title line and banner, which dozer owns, never inside the pane's colors. Dimming a dead pane uses the faint attribute, which works on any background. A style that would make the signal hard to see, such as a red-background pane, is the chrome theme's problem to solve (for example with a contrasting banner), not the pane's.
+
+Scheduled after M5; see the roadmap. Nothing is exposed in the config yet.
+
 ## 5. Configuration (YAML)
 
 Locations: `-c <file>`, otherwise `./.dozer.yaml`, otherwise `~/.config/dozer/config.yaml` (XDG). CLI flags override the file.
@@ -350,7 +376,8 @@ These are designed in from the start, even where v1 uses only one implementation
 | **Deferred** | `C-a S` runtime save of sizes, titles and status bar. Revisit after functional review. |
 | **M6 Ship** | goreleaser, Homebrew tap, `dozer --help`/man page, example configs. |
 | **Functional review** | Try the small-terminal behavior (DP-1) and multi-input ergonomics with real use, then adjust. |
-| **Later** | Themes, pane output logging, control socket (`dozer send`), detach via a client/server split, and possibly runtime split/close. |
+| **Styles** (after M5) | Pane styles and chrome themes (§4.11, DP-5): built-in named styles, inline colors, OSC color query replies, per-focus cursor color. |
+| **Later** | Pane output logging, control socket (`dozer send`), detach via a client/server split, and possibly runtime split/close. |
 
 ## 10. Architectural decision points
 
@@ -433,6 +460,18 @@ Small patches (about 50 lines; three for speed, one for a data race, recorded in
 **Status:** decided for v1; revisit at functional review.
 
 `run:` uses `$SHELL -ic '<cmd>; exec $SHELL'`. The alternative, typing the command into a live shell after it starts, puts the command in history but races with shell start-up because there's no reliable "prompt ready" signal. If real use shows history matters, add `run_mode: type` with a start-up delay as an opt-in. It needs no structural change either way.
+
+### DP-5 · Who owns a pane's colors
+
+**Status:** decided in principle, to support §4.11. Cheap to honor now, expensive to retrofit.
+
+dozer is the color authority. The compositor maps each cell's *semantic* color (default / ANSI 0–15 / 256 / RGB) to what is drawn, per pane. This commits the code to:
+
+1. **Keep cell colors semantic end to end.** The emulator adapter must never flatten "default" or "ANSI red" into RGB. charm vt already keeps `nil`, `BasicColor`, `IndexedColor` and `RGB` distinct.
+2. **Style the chrome from named theme tokens,** not hard-coded colors. In M1 the colors are constants in `internal/app/render.go` (dim, focus, fail); they become a theme struct when §4.11 lands.
+3. **Keep pane styling in one place:** the compositor's cell copy (plus OSC replies in the emulator). Never in the pane or PTY layer.
+
+**Alternative rejected:** emitting OSC 10/11/4 to the host terminal on focus change. The host can hold only one palette at a time, so unfocused panes would render in the wrong style.
 
 ## 11. Risks
 
