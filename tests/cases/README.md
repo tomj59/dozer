@@ -37,7 +37,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 |---|---|---|---|
 | E01 | [Colors and Unicode](E01-color-unicode.sh) | M0 | PARTIAL · Terminal.app · 2026-09-26: colors, styles, Unicode pass; shrink then grow loses cropped output → DP-7 (reflow, M4) |
 | E02 | [Full-screen programs side by side](E02-fullscreen-apps.sh) | M0 | PASS · Terminal.app · 2026-09-26 (top, less, vim side by side) |
-| E03 | [Heavy output in several panes](E03-flood.sh) | M0 | |
+| E03 | [Heavy output in several panes](E03-flood.sh) | M0 | PASS · Terminal.app · 2026-09-26 (3 × 1M lines concurrently, ~2.9 s each) |
 | E04 | [Shell line editing and history](E04-line-editing.sh) | M0 | |
 | E05 | [Bracketed paste and Option/Meta keys](E05-paste-and-meta.sh) | M0 | |
 
