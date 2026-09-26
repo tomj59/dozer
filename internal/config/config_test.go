@@ -96,3 +96,44 @@ func TestExpandDir(t *testing.T) {
 		t.Errorf("absolute dir = %q", got)
 	}
 }
+
+// --save output must load back to the same launch.
+func TestSaveRoundTrip(t *testing.T) {
+	files, _ := filepath.Glob("../../examples/*.yaml")
+	for _, f := range files {
+		c, err := Load(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, err := c.YAML("saved by test")
+		if err != nil {
+			t.Fatalf("%s: %v", f, err)
+		}
+		c2, err := Parse(out, "")
+		if err != nil {
+			t.Fatalf("%s: saved YAML does not load: %v\n%s", f, err, out)
+		}
+		c.Source, c2.Source = "", ""
+		a, b := c.Describe(), c2.Describe()
+		if a != b {
+			t.Errorf("%s: round trip differs\n--- original\n%s--- saved\n%s--- yaml\n%s", f, a, b, out)
+		}
+	}
+}
+
+func TestSaveAfterResize(t *testing.T) {
+	c, _ := Parse([]byte(`layout: "2,1"`), "")
+	r := layout.Solve(c.Layout, 101, 40, c.MinPane)
+	layout.MoveBorder(c.Layout, 0, 10, 0, r, c.MinPane)
+	out, _ := c.YAML("")
+	if !strings.Contains(string(out), "widths: {1: [60fr, 40fr]}") {
+		t.Errorf("resized widths not saved:\n%s", out)
+	}
+	c2, err := Parse(out, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := layout.Solve(c2.Layout, 101, 40, c2.MinPane).Slots; s[0].W != 60 {
+		t.Errorf("reloaded width %d, want 60", s[0].W)
+	}
+}

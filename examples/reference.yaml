@@ -16,6 +16,7 @@ env: {}          # extra environment variables, e.g. { STAGE: dev }
 prefix: C-a      # the command key: C-a … C-z
 min_pane: { w: 20, h: 5 }    # smallest pane content; a smaller window scrolls (DP-1)
 quit_when_all_exited: false  # true = quit dozer once every pane has exited
+status_bar: bottom           # bottom | top | off  (Ctrl-a s toggles it at runtime)
 
 # Layout shorthand: panes per row, top to bottom. "2,1" = two on top, one wide below.
 layout: "2,1"

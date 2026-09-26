@@ -131,3 +131,14 @@ func TestArgvAndLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestKill(t *testing.T) {
+	p := start(t, Spec{Exec: `trap "" HUP; sleep 30`, Restart: RestartAlways}, 20, 3)
+	time.Sleep(200 * time.Millisecond)
+	p.Kill(300 * time.Millisecond) // ignores HUP → SIGKILL after grace
+	waitFor(t, "kill", p.Dead)
+	_, s := draw(p, 20, 3)
+	if s.Signal != "SIGKILL" || s.RestartPending {
+		t.Errorf("signal=%q restartPending=%v, want SIGKILL and no auto restart", s.Signal, s.RestartPending)
+	}
+}

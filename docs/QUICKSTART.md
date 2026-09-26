@@ -1,6 +1,6 @@
 # dozer quickstart
 
-This page teaches you to use dozer as it exists today (M1: multiple panes). When you've finished it, [`M1-CHECKLIST.md`](M1-CHECKLIST.md) is where you record whether it works.
+This page teaches you to use dozer as it exists today (M2: multiple panes with runtime controls). When you've finished it, [`M2-CHECKLIST.md`](M2-CHECKLIST.md) is where you record whether it works. ([`M1-CHECKLIST.md`](M1-CHECKLIST.md) covers the basics, if you haven't done it.)
 
 ## What you're looking at
 
@@ -47,6 +47,11 @@ Every shell needs every normal keystroke, so dozer reserves exactly one key, **`
 | `1` … `9` | Focus pane N |
 | `o` | Focus the next pane |
 | `z` | **Zoom**: the focused pane fills the window. `Ctrl-a z` again restores the layout. |
+| `H` `J` `K` `L` | **Resize**: move the focused pane's border left, down, up or right. Keep pressing the letter (no prefix needed) while the status bar says **RESIZE**. |
+| `=` | Reset all sizes to how the layout launched |
+| `t` | Rename the focused pane (type, then Enter; Esc cancels; empty restores the default) |
+| `s` | Hide or show the status bar |
+| `x` | Kill the focused pane's process (asks first). The pane stays, dead, until you restart it. |
 | `r` | **Restart** the focused pane's command (works whether it's dead or alive) |
 | `R` | Restart **every dead** pane |
 | `Ctrl-l` | Redraw everything (if the screen ever looks wrong) |
@@ -77,6 +82,7 @@ Try it now:
 | `bin/dozer -p a -p b -p c -p d` | No `-l`: the layout is fitted to the commands (4 → `2,2`) |
 | `printf 'top\ngit status\n' \| bin/dozer` | Piped: one pane command per line |
 | `bin/dozer --prefix C-b` | Use `Ctrl-b` as the prefix instead |
+| `bin/dozer -l 2,1 -p htop --save my.yaml` | Don't launch; write what you'd get as a config file (`--save -` prints it) |
 
 Sizes accept `60` or `60%` (percent), `12c` (fixed rows or columns) and `2fr` (a share of what's left).
 
@@ -116,7 +122,6 @@ dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has die
 
 - **No mouse yet.** Clicking doesn't focus panes and apps like htop don't receive clicks until M4. Your terminal's own text selection still works.
 - **No scrollback.** Output that scrolls off the top of a pane is gone for now (M4). The scroll wheel may cycle shell history instead.
-- **No resizing of splits at runtime yet** (`Ctrl-a H/J/K/L` comes later). Set sizes at launch with `--heights`/`--widths` or the config.
 - **A window that's too small** keeps panes at a minimum size and scrolls the view to the focused pane. The status bar shows `more ◀ ▶` when part of the layout is off-screen.
 - **Option key as Meta** depends on your terminal setting, just as without dozer:
   - Terminal.app: Settings → Profiles → Keyboard → "Use Option as Meta key"

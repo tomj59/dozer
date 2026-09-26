@@ -64,6 +64,9 @@ func (s Size) String() string {
 // ParseSize parses "60", "60%", "20c" or "2fr". A bare number is a percent.
 func ParseSize(s string) (Size, error) {
 	s = strings.TrimSpace(s)
+	if s == "auto" {
+		return Size{}, nil
+	}
 	unit := Percent
 	switch {
 	case strings.HasSuffix(s, "%"):
@@ -75,7 +78,7 @@ func ParseSize(s string) (Size, error) {
 	}
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil || v <= 0 || math.IsInf(v, 0) {
-		return Size{}, fmt.Errorf("bad size %q (use 60, 60%%, 20c or 2fr)", s)
+		return Size{}, fmt.Errorf("bad size %q (use 60, 60%%, 20c, 2fr or auto)", s)
 	}
 	return Size{Value: v, Unit: unit}, nil
 }
@@ -415,4 +418,123 @@ func roundInto(out []int, f []float64, fixed []bool, target int) {
 		out[rems[best].i]++
 		rems[best].r = -1
 	}
+}
+
+// Clone returns a deep copy of the tree.
+func (n *Node) Clone() *Node {
+	c := *n
+	c.Children = nil
+	for _, ch := range n.Children {
+		c.Children = append(c.Children, ch.Clone())
+	}
+	return &c
+}
+
+// Extent is the rectangle covered by n's pane slots in a solved layout.
+func Extent(n *Node, r Result) Rect {
+	if n.Leaf() {
+		return r.Slots[n.Pane]
+	}
+	e := Extent(n.Children[0], r)
+	for _, ch := range n.Children[1:] {
+		o := Extent(ch, r)
+		x0, y0 := min(e.X, o.X), min(e.Y, o.Y)
+		x1, y1 := max(e.X+e.W, o.X+o.W), max(e.Y+e.H, o.Y+o.H)
+		e = Rect{x0, y0, x1 - x0, y1 - y0}
+	}
+	return e
+}
+
+// path returns the nodes from root down to pane's leaf.
+func path(n *Node, pane int) []*Node {
+	if n.Leaf() {
+		if n.Pane == pane {
+			return []*Node{n}
+		}
+		return nil
+	}
+	for _, ch := range n.Children {
+		if p := path(ch, pane); p != nil {
+			return append([]*Node{n}, p...)
+		}
+	}
+	return nil
+}
+
+// MoveBorder moves the border of pane's area in direction (dx, dy) by
+// |dx| columns or |dy| rows, the way tmux's resize-pane does. The border
+// on the side the move points to is used, or the opposite border if the
+// pane touches that edge of its split. It works on the nearest enclosing
+// split of the right direction. Sizes of that split become weights equal
+// to their current cells, so the new proportions survive window resizes.
+// It reports whether anything changed.
+func MoveBorder(root *Node, pane, dx, dy int, r Result, m Min) bool {
+	dir, delta := Cols, dx
+	if dy != 0 {
+		dir, delta = Rows, dy
+	}
+	if delta == 0 {
+		return false
+	}
+	p := path(root, pane)
+	for i := len(p) - 2; i >= 0; i-- {
+		split := p[i]
+		if split.Dir != dir || len(split.Children) < 2 {
+			continue
+		}
+		k := indexOf(split.Children, p[i+1])
+		// Border between children a and a+1.
+		// Use the border on the side the move points to; if the pane is at
+		// that edge of the split, use the border on its other side.
+		a := k // border after child k
+		if delta < 0 {
+			a = k - 1 // border before child k
+		}
+		if a < 0 {
+			a = 0
+		}
+		if a >= len(split.Children)-1 {
+			a = len(split.Children) - 2
+		}
+		if a < 0 || a+1 >= len(split.Children) {
+			continue
+		}
+		lens := make([]int, len(split.Children))
+		mins := make([]int, len(split.Children))
+		for j, ch := range split.Children {
+			e := Extent(ch, r)
+			mw, mh := minSize(ch, m)
+			if dir == Cols {
+				lens[j], mins[j] = e.W, mw
+			} else {
+				lens[j], mins[j] = e.H, mh
+			}
+		}
+		// Moving the border by delta grows child a and shrinks a+1.
+		d := delta
+		if d > 0 {
+			d = min(d, lens[a+1]-mins[a+1])
+		} else {
+			d = max(d, mins[a]-lens[a])
+		}
+		if d == 0 {
+			return false
+		}
+		lens[a] += d
+		lens[a+1] -= d
+		for j, ch := range split.Children {
+			ch.Size = Size{Value: float64(lens[j]), Unit: Weight}
+		}
+		return true
+	}
+	return false
+}
+
+func indexOf(list []*Node, n *Node) int {
+	for i, x := range list {
+		if x == n {
+			return i
+		}
+	}
+	return -1
 }

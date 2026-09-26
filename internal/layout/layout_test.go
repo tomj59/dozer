@@ -131,3 +131,54 @@ func TestSizesCoverCanvas(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveBorder(t *testing.T) {
+	root := mustParse(t, "2,1")
+	m := Min{W: 10, H: 3}
+	solve := func() Result { return Solve(root, 101, 40, m) }
+
+	// Pane 0 (top-left) → right: its right border moves right, it grows.
+	if !MoveBorder(root, 0, 4, 0, solve(), m) {
+		t.Fatal("no change")
+	}
+	if s := solve().Slots; s[0].W != 54 || s[1].W != 46 {
+		t.Errorf("after →: widths %d/%d, want 54/46", s[0].W, s[1].W)
+	}
+	// Pane 1 (top-right, last child) → right: its left border moves right, it shrinks.
+	MoveBorder(root, 1, 4, 0, solve(), m)
+	if s := solve().Slots; s[0].W != 58 || s[1].W != 42 {
+		t.Errorf("after pane 1 →: widths %d/%d, want 58/42", s[0].W, s[1].W)
+	}
+	// Pane 2 (bottom) ↑: its top border moves up, it grows; top row shrinks.
+	MoveBorder(root, 2, 0, -5, solve(), m)
+	if s := solve().Slots; s[0].H != 15 || s[2].H != 25 {
+		t.Errorf("after ↑: heights %d/%d, want 15/25", s[0].H, s[2].H)
+	}
+	// Proportions survive a window resize (weights, not cells).
+	if s := Solve(root, 201, 80, m).Slots; s[0].H != 30 {
+		t.Errorf("after window resize: top height %d, want 30", s[0].H)
+	}
+	// Minimums stop the border.
+	for i := 0; i < 50; i++ {
+		MoveBorder(root, 0, -4, 0, solve(), m)
+	}
+	if s := solve().Slots; s[0].W != 10 {
+		t.Errorf("min width not honored: %d", s[0].W)
+	}
+	if MoveBorder(root, 0, -4, 0, solve(), m) {
+		t.Error("move past the minimum should report no change")
+	}
+	// A single-pane row has no vertical border to move.
+	if MoveBorder(root, 2, 4, 0, solve(), m) {
+		t.Error("pane 2 has no column split")
+	}
+}
+
+func TestClone(t *testing.T) {
+	a := mustParse(t, "2,1")
+	b := a.Clone()
+	b.Children[0].Size = Size{50, Cells}
+	if a.Children[0].Size.Unit == Cells {
+		t.Error("clone shares nodes")
+	}
+}

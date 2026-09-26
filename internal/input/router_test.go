@@ -3,6 +3,7 @@ package input
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 func collect(r *Router, chunks ...string) (fwd string, cmds string) {
@@ -48,5 +49,31 @@ func TestRouter(t *testing.T) {
 				t.Fatalf("got fwd=%q cmds=%q, want fwd=%q cmds=%q", fwd, cmds, tt.fwd, tt.cmds)
 			}
 		})
+	}
+}
+
+func TestArmRepeat(t *testing.T) {
+	now := time.Unix(0, 0)
+	r := NewRouter(0x01)
+	r.Now = func() time.Time { return now }
+	_, cmds := collect(r, "\x01H")
+	r.Arm(time.Second)
+	_, more := collect(r, "H")
+	now = now.Add(500 * time.Millisecond)
+	r.Arm(time.Second)
+	_, more2 := collect(r, "H")
+	now = now.Add(2 * time.Second)
+	fwd, late := collect(r, "H")
+	if cmds != "H" || more != "H" || more2 != "H" || late != "" || fwd != "H" {
+		t.Errorf("cmds=%q more=%q more2=%q late=%q fwd=%q", cmds, more, more2, late, fwd)
+	}
+	if r.Pending() {
+		t.Error("expired arm should not be pending")
+	}
+	// Prefix during a repeat window starts a new command, not a literal.
+	r.Arm(time.Second)
+	fwd, cmds = collect(r, "\x01=")
+	if fwd != "" || cmds != "=" {
+		t.Errorf("prefix while armed: fwd=%q cmds=%q, want command '='", fwd, cmds)
 	}
 }

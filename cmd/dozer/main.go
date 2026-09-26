@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
@@ -46,8 +47,9 @@ const usage = `usage: dozer [flags] [profile | config.yaml]
 
 Several shells in one terminal. Prefix key Ctrl-a, then:
   ←↑↓→ / hjkl / 1-9 / o   focus a pane       z   zoom the focused pane
-  r   restart focused pane   R   restart every dead pane
-  C-l redraw   q quit (asks if panes are running)   Esc cancel
+  H J K L   move the focused pane's border (repeatable)   =  reset sizes
+  r   restart focused pane   R   restart every dead pane   x  kill focused pane
+  t   rename pane   s   toggle status bar   C-l redraw   q quit   Esc cancel
 
 Examples:
   dozer                          default 2,1 layout, your shell in every pane
@@ -56,6 +58,7 @@ Examples:
   dozer -c examples/dev.yaml     load a config (see examples/)
   dozer dev                      load ~/.config/dozer/dev.yaml
   printf 'top\nping 1.1.1.1\n' | dozer   piped: one pane command per line
+  dozer -l 2,1 -p htop --save my.yaml   turn a command line into a config file
 
 Flags:
 `
@@ -70,6 +73,7 @@ func main() {
 		prefix    = flag.String("prefix", "", "prefix key, e.g. C-b (default C-a)")
 		quitAll   = flag.Bool("quit-when-all-exited", false, "quit once every pane has exited (default: stay, showing dead panes)")
 		check     = flag.Bool("check", false, "validate and print the resolved configuration, then exit")
+		save      = flag.String("save", "", "write the resolved configuration as YAML to `file` (- = stdout), then exit")
 		emuName   = flag.String("emu", "charm", fmt.Sprintf("terminal emulator back end %v", emu.Names))
 		showVer   = flag.Bool("version", false, "print version and exit")
 	)
@@ -93,6 +97,27 @@ func main() {
 	}
 	if *check {
 		fmt.Print(cfg.Describe())
+		if *save == "" {
+			return
+		}
+	}
+	if *save != "" {
+		hdr := fmt.Sprintf("Saved by dozer %s --save on %s.\nConfiguration only: layout, sizes, display settings and each pane's launch command.", version, time.Now().Format("2006-01-02 15:04"))
+		out, err := cfg.YAML(hdr)
+		if err == nil {
+			if *save == "-" {
+				_, err = os.Stdout.Write(out)
+			} else {
+				err = os.WriteFile(*save, out, 0o644)
+			}
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "dozer: --save:", err)
+			os.Exit(1)
+		}
+		if *save != "-" {
+			fmt.Fprintf(os.Stderr, "dozer: saved %s (run it with: dozer -c %s)\n", *save, *save)
+		}
 		return
 	}
 

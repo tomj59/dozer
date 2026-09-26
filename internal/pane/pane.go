@@ -98,19 +98,20 @@ type Pane struct {
 	emuName string
 	dirty   func()
 
-	mu       sync.Mutex // guards everything below
-	em       emu.Emulator
-	ptmx     *os.File
-	cmd      *exec.Cmd
-	cols     int
-	rows     int
-	gen      int // incremented per start; stale exits are ignored
-	state    State
-	code     int    // exit status (Exited/Failed)
-	signal   string // e.g. "SIGKILL" if killed by a signal
-	exitedAt time.Time
-	restarts int         // consecutive automatic restarts (for back-off)
-	timer    *time.Timer // pending automatic restart
+	mu        sync.Mutex // guards everything below
+	em        emu.Emulator
+	ptmx      *os.File
+	cmd       *exec.Cmd
+	cols      int
+	rows      int
+	gen       int // incremented per start; stale exits are ignored
+	state     State
+	code      int    // exit status (Exited/Failed)
+	signal    string // e.g. "SIGKILL" if killed by a signal
+	exitedAt  time.Time
+	restarts  int         // consecutive automatic restarts (for back-off)
+	noRestart bool        // killed on purpose: skip automatic restart once
+	timer     *time.Timer // pending automatic restart
 }
 
 // New creates a pane; call Start to launch its process. dirty is called
@@ -232,6 +233,9 @@ func (p *Pane) exitedLocked(werr error) {
 
 	// Opt-in automatic restart with back-off: 1s, 2s, 4s … capped at 30s.
 	pol := p.Spec.Restart
+	if p.noRestart {
+		pol, p.noRestart = RestartNever, false
+	}
 	if pol == RestartAlways || (pol == RestartOnFailure && p.state != Exited) {
 		delay := time.Second << min(p.restarts, 5)
 		delay = min(delay, 30*time.Second)
@@ -253,8 +257,48 @@ func (p *Pane) exitedLocked(werr error) {
 func (p *Pane) Restart() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.restarts = 0
+	p.restarts, p.noRestart = 0, false
 	return p.startLocked()
+}
+
+// Kill hangs up the pane's process group and, if it is still running
+// after grace, kills it. The pane stays, as a dead pane.
+func (p *Pane) Kill(grace time.Duration) {
+	p.mu.Lock()
+	if p.state != Running || p.cmd == nil || p.cmd.Process == nil {
+		p.mu.Unlock()
+		return
+	}
+	pid, gen := p.cmd.Process.Pid, p.gen
+	if p.timer != nil { // a manual kill cancels automatic restarts
+		p.timer.Stop()
+		p.timer = nil
+	}
+	p.noRestart = true
+	p.mu.Unlock()
+	_ = syscall.Kill(-pid, syscall.SIGHUP)
+	time.AfterFunc(grace, func() {
+		p.mu.Lock()
+		alive := p.gen == gen && p.state == Running
+		p.mu.Unlock()
+		if alive {
+			_ = syscall.Kill(-pid, syscall.SIGKILL)
+		}
+	})
+}
+
+// SetTitle renames the pane (runtime control #2 in docs/SPEC.md §4.8).
+func (p *Pane) SetTitle(t string) {
+	p.mu.Lock()
+	p.Spec.Title = t
+	p.mu.Unlock()
+}
+
+// Label returns the pane's current label.
+func (p *Pane) Label() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.Spec.Label()
 }
 
 // Input sends bytes to the child as if typed. Dead panes ignore input.

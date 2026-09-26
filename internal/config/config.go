@@ -25,9 +25,11 @@ type Config struct {
 	Source            string // file it came from, "" if flags only
 	Layout            *layout.Node
 	Panes             []pane.Spec // indexed by pane number (reading order)
+	PaneNames         []string    // tree-form layouts: the pane names, by number
 	Prefix            byte
 	MinPane           layout.Min
 	QuitWhenAllExited bool
+	StatusBar         string   // "bottom" (default), "top" or "off"
 	Warnings          []string // accepted but not implemented yet, etc.
 }
 
@@ -49,7 +51,7 @@ type file struct {
 	// Accepted now, implemented in later milestones.
 	Mouse      yaml.Node `yaml:"mouse"`
 	Scrollback yaml.Node `yaml:"scrollback"`
-	StatusBar  yaml.Node `yaml:"status_bar"`
+	StatusBar  string    `yaml:"status_bar"`
 	MultiInput yaml.Node `yaml:"multi_input"`
 	Keys       yaml.Node `yaml:"keys"`
 }
@@ -71,7 +73,7 @@ type paneFile struct {
 // Defaults returns the configuration for a bare `dozer`.
 func Defaults() *Config {
 	root, _ := layout.Parse("default")
-	return &Config{Layout: root, Panes: make([]pane.Spec, root.Panes()), Prefix: 0x01, MinPane: layout.Min{W: 20, H: 5}}
+	return &Config{Layout: root, Panes: make([]pane.Spec, root.Panes()), Prefix: 0x01, MinPane: layout.Min{W: 20, H: 5}, StatusBar: "bottom"}
 }
 
 // Load reads and resolves a YAML config file.
@@ -103,7 +105,7 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 	c.Name = f.Name
 
 	for key, n := range map[string]*yaml.Node{"mouse": &f.Mouse, "scrollback": &f.Scrollback,
-		"status_bar": &f.StatusBar, "multi_input": &f.MultiInput, "keys": &f.Keys} {
+		"multi_input": &f.MultiInput, "keys": &f.Keys} {
 		if n.Kind != 0 {
 			c.Warnings = append(c.Warnings, fmt.Sprintf("line %d: %q is not implemented yet; ignored", n.Line, key))
 		}
@@ -124,6 +126,13 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 		c.MinPane = layout.Min{W: f.MinPane.W, H: f.MinPane.H}
 	}
 	c.QuitWhenAllExited = f.QuitWhenAllExited
+	switch f.StatusBar {
+	case "":
+	case "top", "bottom", "off":
+		c.StatusBar = f.StatusBar
+	default:
+		return nil, fmt.Errorf("status_bar must be top, bottom or off")
+	}
 
 	// Layout: shorthand string or a rows/cols tree.
 	names := map[string]int{} // tree form: pane name → index
@@ -154,6 +163,12 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 		}
 	}
 	c.Panes = make([]pane.Spec, c.Layout.Panes())
+	if len(names) > 0 {
+		c.PaneNames = make([]string, len(c.Panes))
+		for name, i := range names {
+			c.PaneNames[i] = name
+		}
+	}
 
 	// Panes: a list in reading order, or a map keyed by tree pane names.
 	base := pane.Spec{Shell: f.Shell, Dir: expandDir(f.Cwd, baseDir), Env: envList(f.Env)}
@@ -450,7 +465,7 @@ func (c *Config) Describe() string {
 	if c.Name != "" {
 		fmt.Fprintf(&b, "name:   %s\n", c.Name)
 	}
-	fmt.Fprintf(&b, "prefix: C-%c   min pane: %dx%d   quit when all exited: %v\n", 'a'+c.Prefix-1, c.MinPane.W, c.MinPane.H, c.QuitWhenAllExited)
+	fmt.Fprintf(&b, "prefix: C-%c   min pane: %dx%d   status bar: %s   quit when all exited: %v\n", 'a'+c.Prefix-1, c.MinPane.W, c.MinPane.H, c.StatusBar, c.QuitWhenAllExited)
 	fmt.Fprintf(&b, "layout: %s\n", describeNode(c.Layout))
 	for i, p := range c.Panes {
 		what := "shell"

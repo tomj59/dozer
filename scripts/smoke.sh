@@ -80,6 +80,28 @@ check "unzoom" "─ \[3\]"
 send C-a C-l
 check "C-a C-l redraw keeps screen" "marker-two"
 
+# Runtime resize: C-a L then L again (repeat window) moves the border right.
+border() { screen | head -1 | python3 -c 'import sys; print(sys.stdin.readline().index("┬"))'; }
+before=$(border)
+send C-a L
+check "resize mode shown" "RESIZE"
+send L
+after=$(border)
+if [ "$after" -eq $((before + 4)) ]; then ok "C-a L L grows pane 1 by 4"; else bad "C-a L L: border $before → $after, want +4"; fi
+send C-a =
+after=$(border)
+if [ "$after" -eq "$before" ]; then ok "C-a = resets sizes"; else bad "C-a =: border $after, want $before"; fi
+
+send C-a t
+check "title prompt" "Title for \[1\]"
+send C-u 'my-title' Enter
+check "pane renamed" "─ \[1\] my-title"
+
+send C-a s
+if screen | tail -1 | grep -q "my-title"; then bad "C-a s hides status bar"; else ok "C-a s hides status bar"; fi
+send C-a s
+check "C-a s shows it again" "│ \[1\] my-title"
+
 send 'time seq 1 200000' Enter
 sleep 3
 check "flood finishes" "^real"
@@ -87,7 +109,7 @@ check "flood finishes" "^real"
 send C-a q
 check "quit asks when panes run" "Quit dozer?"
 send n
-check "declining keeps dozer" "│ \[1\] bash"
+check "declining keeps dozer" "│ \[1\] "
 quit
 if tmux has-session -t "$S" 2>/dev/null; then bad "C-a q y quits"; else ok "C-a q y quits"; fi
 
@@ -111,6 +133,13 @@ check "dead count in status bar" "1 dead"
 send C-a 2
 send C-a r
 check "restart flash" "restarted \[2\]"
+send C-a x
+check "kill asks" "Kill \[2\]"
+send y
+sleep 0.5
+check "killed pane flagged" "✖ SIGHUP"
+send C-a r
+sleep 0.5
 send 'exit' Enter
 sleep 0.5
 if tmux has-session -t "$S" 2>/dev/null; then ok "dozer stays when panes exit"; else bad "dozer stays when panes exit"; fi

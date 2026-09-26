@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.8 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.9 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -87,7 +87,7 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 | `C-a ←↑↓→` / `h j k l` | Move focus |
 | `C-a 1-9` | Focus pane N |
 | `C-a o` | Focus the next pane |
-| `C-a H J K L` | Resize the focused split (existing splits only) |
+| `C-a H J K L` | Move the focused pane's border left/down/up/right (tmux-style: the border on that side, or the opposite one at an edge). 2 columns / 1 row per press. Repeatable without the prefix for 0.7 s (status: RESIZE). Existing splits only. |
 | `C-a =` | Reset split sizes to the launch layout |
 | `C-a z` | Zoom or unzoom the focused pane |
 | `C-a [` | Scroll/copy mode (vi keys, `/` search, `q` exits) |
@@ -151,7 +151,7 @@ This is every setting that can change after launch, as currently specified. **It
 
 | # | Setting | How to change it | Saveable? |
 |---|---|---|---|
-| 1 | **Split sizes** | `C-a H J K L`, drag a border with the mouse, `C-a =` to reset | **Yes.** The only substantial one. |
+| 1 | **Split sizes** | `C-a H J K L`, `C-a =` to reset (M2); drag a border with the mouse (M4) | **Yes.** The only substantial one. |
 | 2 | **Pane titles** | `C-a t` | **Yes** |
 | 3 | **Status bar on/off** | `C-a s` | **Yes** (display pref) |
 | 4 | Zoomed pane | `C-a z` | No. It's view state. |
@@ -179,7 +179,7 @@ This is every setting that can change after launch, as currently specified. **It
 
 Scope, now and later: **configuration only**. dozer never tries to restore process, history, shell or remote-session state.
 
-- **v1 (stub):** `dozer <flags> --save <file.yaml>` resolves the launch inputs (CLI flags, piped commands, config file, defaults) into one canonical YAML file and exits without launching. This is useful on its own, because it turns a long command line into a profile. `--save -` writes to stdout.
+- **v1 (stub), implemented in M2:** `dozer <flags> --save <file.yaml>` resolves the launch inputs (CLI flags, piped commands, config file, defaults) into one canonical YAML file and exits without launching. This is useful on its own, because it turns a long command line into a profile. `--save -` writes to stdout.
 - **Later (runtime save):** `C-a S` writes the same YAML with the current values of controls 1–3 from §4.8 merged in. This is deferred until real use shows runtime tuning is worth capturing.
 - Both paths use the same serializer. The only difference is whether the runtime deltas get merged in.
 
@@ -287,13 +287,13 @@ Validation errors are reported with the line number. `dozer --check <file>` vali
 
 **Implemented so far (M1):**
 
-- Top-level keys: `version`, `name`, `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths`, `panes` (list or named map), `min_pane`, `quit_when_all_exited`.
+- Top-level keys: `version`, `name`, `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths` (sizes also accept `auto`), `panes` (list or named map), `min_pane`, `quit_when_all_exited`, `status_bar` (M2).
 - Pane keys: `title`, `run`, `exec`, `cwd`, `env`, `shell`, `restart`.
 - A bare string in the pane list is shorthand for `run:`.
 
 Keys from later milestones are accepted but produce a warning in `--check` (they're ignored for now):
 
-- top level: `mouse`, `scrollback`, `status_bar`, `multi_input`, `keys`
+- top level: `mouse`, `scrollback`, `multi_input`, `keys`
 - pane: `readonly`, `group`, `min`
 
 Unknown keys are errors. Working examples ship in `examples/`, and every one is loaded by the test suite.
@@ -368,11 +368,11 @@ These are designed in from the start, even where v1 uses only one implementation
 |---|---|
 | **M0 Spike** ✅ (Mac: basics, cursor fix confirmed; sections 2–3 pending) | One pane in full screen, driven through the chosen emulator. Pass criteria: vim, htop, and `less` all work, resize is correct, `cat` of a large file stays smooth. Decide the emulator library and the input approach. |
 | **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
-| **M2 Control** | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
+| **M2 Control** (Linux ✅, Mac pending) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
 | **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
-| **M3 (add-on)** | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
+| **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
 | **Deferred** | `C-a S` runtime save of sizes, titles and status bar. Revisit after functional review. |
 | **M6 Ship** | goreleaser, Homebrew tap, `dozer --help`/man page, example configs. |
 | **Functional review** | Try the small-terminal behavior (DP-1) and multi-input ergonomics with real use, then adjust. |

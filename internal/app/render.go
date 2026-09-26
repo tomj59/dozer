@@ -71,7 +71,7 @@ func (a *App) render() {
 
 	// Viewport: keep the focused slot on screen.
 	w, h := a.term.Size()
-	sh := max(h-1, 1)
+	y0, sh := a.area(w, h)
 	fs := slots[focus]
 	a.view.vx = follow(a.view.vx, fs.X, fs.W, w, a.res.W)
 	a.view.vy = follow(a.view.vy, fs.Y, fs.H, sh, a.res.H)
@@ -80,17 +80,25 @@ func (a *App) render() {
 		for x := 0; x < w; x++ {
 			c := cv.CellAt(a.view.vx+x, a.view.vy+y)
 			if c == nil || (x == 0 && c.Width == 0 && c.Content == "") {
-				scr.SetCell(x, y, nil)
+				scr.SetCell(x, y0+y, nil)
 				continue
 			}
-			scr.SetCell(x, y, c)
+			scr.SetCell(x, y0+y, c)
 			if c.Width > 1 {
 				x += c.Width - 1
 			}
 		}
 	}
 
-	a.drawStatus(scr, h-1, w, focusSnap, dead)
+	// The bar also appears (over the bottom row) while hidden if dozer
+	// needs to say something: a prefix, question or prompt.
+	modal := a.mode.Load() != modeNormal || a.prefixShown()
+	if a.barOn || modal {
+		cx, ok := a.drawStatus(scr, a.barRow(h), w, focusSnap, dead)
+		if ok { // text prompt: put the cursor in it
+			cursorX, cursorY, cursorOn = cx+a.view.vx, a.barRow(h)-y0+a.view.vy, true
+		}
+	}
 
 	// Mouse passthrough needs coordinate translation per pane (M4); until
 	// then only key, paste and focus modes are mirrored.
@@ -98,8 +106,8 @@ func (a *App) render() {
 	m.MouseX10, m.MouseNormal, m.MouseButton, m.MouseAny, m.MouseSGR = false, false, false, false, false
 	a.term.Mirror(m)
 
-	show := cursorOn && !a.pending.Load() && !a.confirming.Load()
-	_ = a.term.Present(cursorX-a.view.vx, cursorY-a.view.vy, show)
+	show := cursorOn && !a.prefixShown() && a.mode.Load() != modeConfirm
+	_ = a.term.Present(cursorX-a.view.vx, y0+cursorY-a.view.vy, show)
 }
 
 // follow returns a viewport offset that keeps [pos, pos+size) visible.
@@ -181,7 +189,7 @@ func (a *App) drawTitle(cv uv.Screen, s layout.Rect, i int, snap pane.Snapshot, 
 	for x := s.X; x < end; x++ {
 		cv.SetCell(x, s.Y, &uv.Cell{Content: "─", Width: 1, Style: line})
 	}
-	label := a.panes[i].Spec.Label()
+	label := a.panes[i].Label()
 	if snap.Title != "" && a.panes[i].Spec.Title == "" {
 		label = snap.Title // the program's own title, unless the config named the pane
 	}
@@ -259,7 +267,9 @@ func boxChar(up, down, l, r bool) string {
 }
 
 // drawStatus draws the bottom status bar.
-func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead int) {
+// drawStatus draws the status bar on row y. For a text prompt it returns
+// the cursor column and true.
+func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead int) (int, bool) {
 	base := uv.Style{Attrs: uv.AttrReverse}
 	for x := 0; x < w; x++ {
 		scr.SetCell(x, y, &uv.Cell{Content: " ", Width: 1, Style: base})
@@ -267,17 +277,26 @@ func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead 
 	pfx := fmt.Sprintf("C-%c", 'a'+a.cfg.Prefix-1)
 	focus := int(a.focus.Load())
 	var left string
+	loud := true
 	switch {
-	case a.confirming.Load():
-		left = fmt.Sprintf(" Quit dozer? %d pane(s) still running will be closed. y = quit, any other key = stay ", a.running())
-	case a.pending.Load():
-		left = " PREFIX │ ←↑↓→ hjkl 1-9 o focus · z zoom · r restart · R restart dead · C-l redraw · q quit · Esc cancel "
+	case a.mode.Load() == modeConfirm:
+		left = " " + a.confirmMsg + "  y = yes, any other key = no "
+	case a.mode.Load() == modePrompt:
+		left = " " + a.promptMsg + " " + string(a.promptBuf)
+		x := put(scr, 0, y, w, left, withBold(base, true))
+		put(scr, x+1, y, w, "  Enter = save · Esc = cancel · empty = default ", base)
+		return x, true
+	case a.prefixShown() && a.armedUntil.Load() != 0:
+		left = " RESIZE │ H J K L again to keep resizing · = reset sizes · any other key to finish "
+	case a.prefixShown():
+		left = " PREFIX │ ←↑↓→ hjkl 1-9 o focus · z zoom · HJKL resize · = reset · r/R restart · x kill · t title · s bar · C-l redraw · q quit · Esc "
 	default:
+		loud = false
 		name := a.cfg.Name
 		if name == "" {
 			name = "dozer"
 		}
-		left = fmt.Sprintf(" %s │ [%d] %s ", name, focus+1, a.panes[focus].Spec.Label())
+		left = fmt.Sprintf(" %s │ [%d] %s ", name, focus+1, a.panes[focus].Label())
 		if a.zoomed {
 			left += "│ ZOOM "
 		}
@@ -285,7 +304,7 @@ func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead 
 			left += "│ " + a.flash + " "
 		}
 	}
-	x := put(scr, 0, y, w, left, withBold(base, a.pending.Load() || a.confirming.Load()))
+	x := put(scr, 0, y, w, left, withBold(base, loud))
 
 	// Right side: segments in priority order; the leftmost-listed survive
 	// on narrow screens. Dead panes are loud (red); the rest is calm.
@@ -294,7 +313,7 @@ func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead 
 		st   uv.Style
 	}
 	var segs []seg
-	calm := !a.pending.Load() && !a.confirming.Load()
+	calm := !loud
 	if dead > 0 && calm {
 		segs = append(segs, seg{fmt.Sprintf(" ✖ %d dead · %s R ", dead, pfx), uv.Style{Fg: colBarText, Bg: colFail, Attrs: uv.AttrBold}})
 	}
@@ -319,6 +338,7 @@ func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead 
 		}
 		segs = segs[:len(segs)-1]
 	}
+	return 0, false
 }
 
 func withBold(s uv.Style, on bool) uv.Style {
@@ -331,7 +351,7 @@ func withBold(s uv.Style, on bool) uv.Style {
 // scrollHint shows which directions have off-screen canvas (DP-1).
 func (a *App) scrollHint() string {
 	w, h := a.term.Size()
-	sh := max(h-1, 1)
+	_, sh := a.area(w, h)
 	var b strings.Builder
 	if a.view.vx > 0 {
 		b.WriteString("◀")

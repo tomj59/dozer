@@ -8,6 +8,8 @@
 // correctly for it.)
 package input
 
+import "time"
+
 // Kind is the kind of an Action.
 type Kind int
 
@@ -49,16 +51,52 @@ type Router struct {
 	seqLen  int  // bytes of that sequence after ESC [ / ESC O
 	inPaste bool
 	match   int // bytes of pasteStart/pasteEnd matched so far
+
+	// Repeat: after a repeatable command (e.g. resize), the prefix stays
+	// armed until armedUntil so the key can be pressed again without it.
+	armedUntil time.Time
+	Now        func() time.Time // for tests; default time.Now
+}
+
+// Arm keeps the prefix pending until d from now, so a repeatable command
+// key can be pressed again without the prefix (tmux's repeat-time).
+func (r *Router) Arm(d time.Duration) {
+	r.pending = true
+	r.armedUntil = r.now().Add(d)
+}
+
+// Armed reports whether the prefix is pending because of Arm.
+func (r *Router) Armed() bool {
+	return r.pending && !r.armedUntil.IsZero() && r.now().Before(r.armedUntil)
+}
+
+func (r *Router) now() time.Time {
+	if r.Now != nil {
+		return r.Now()
+	}
+	return time.Now()
 }
 
 // NewRouter returns a router for the given prefix byte.
 func NewRouter(prefix byte) *Router { return &Router{Prefix: prefix} }
 
 // Pending reports whether the prefix was pressed and a command key is awaited.
-func (r *Router) Pending() bool { return r.pending }
+func (r *Router) Pending() bool {
+	r.expire()
+	return r.pending
+}
+
+// expire drops an Arm'ed prefix whose repeat window has passed.
+func (r *Router) expire() {
+	if !r.armedUntil.IsZero() && !r.now().Before(r.armedUntil) {
+		r.pending = false
+		r.armedUntil = time.Time{}
+	}
+}
 
 // Feed routes a chunk of raw input.
 func (r *Router) Feed(b []byte) []Action {
+	r.expire()
 	var out []Action
 	start := 0 // start of the current forward run
 	flush := func(end int) {
@@ -97,7 +135,15 @@ func (r *Router) Feed(b []byte) []Action {
 			}
 		}
 		if r.pending {
+			if c == r.Prefix && !r.armedUntil.IsZero() {
+				// The prefix pressed during a repeat window starts a fresh
+				// command rather than sending a literal prefix.
+				r.armedUntil = time.Time{}
+				start = i + 1
+				continue
+			}
 			r.pending = false
+			r.armedUntil = time.Time{}
 			if c == 0x1b { // Esc alone, or the start of an arrow/function key: cancel
 				r.skipSeq = 1
 				start = i + 1
