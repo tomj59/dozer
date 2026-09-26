@@ -37,6 +37,7 @@ type Router struct {
 	Prefix byte // default 0x01 (Ctrl-a)
 
 	pending bool // prefix seen, waiting for the command key
+	skipSeq int  // >0: discarding an escape sequence pressed as a command key
 	inPaste bool
 	match   int // bytes of pasteStart/pasteEnd matched so far
 }
@@ -62,8 +63,32 @@ func (r *Router) Feed(b []byte) []Action {
 		if r.inPaste {
 			continue
 		}
+		if r.skipSeq > 0 {
+			// An arrow/function key was pressed as the command key. Drop the
+			// rest of its escape sequence so "[A" isn't typed into the pane.
+			// Keys arrive whole in one read, so this never spans chunks.
+			if r.skipSeq == 1 {
+				if c == '[' || c == 'O' {
+					r.skipSeq = 2
+					start = i + 1
+					continue
+				}
+				r.skipSeq = 0 // a lone Esc: handle c normally below
+			} else {
+				if c >= 0x40 && c <= 0x7e { // final byte ends the sequence
+					r.skipSeq = 0
+				}
+				start = i + 1
+				continue
+			}
+		}
 		if r.pending {
 			r.pending = false
+			if c == 0x1b { // Esc alone, or the start of an arrow/function key: cancel
+				r.skipSeq = 1
+				start = i + 1
+				continue
+			}
 			if c == r.Prefix { // prefix twice: send one literal prefix
 				start = i
 				continue
@@ -78,6 +103,7 @@ func (r *Router) Feed(b []byte) []Action {
 			start = i + 1
 		}
 	}
+	r.skipSeq = 0
 	if !r.pending {
 		flush(len(b))
 	}

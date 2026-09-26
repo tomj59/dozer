@@ -69,6 +69,7 @@ func Run(o Options) (code int, err error) {
 	defer p.Close()
 
 	quit := make(chan struct{})
+	redraw := make(chan struct{}, 1)
 	router := input.NewRouter(o.Prefix)
 	var prefixPending atomic.Bool
 
@@ -90,6 +91,11 @@ func Run(o Options) (code int, err error) {
 					case 'q':
 						close(quit)
 						return
+					case 'l': // repaint everything (e.g. after Cmd-K cleared the host screen)
+						select {
+						case redraw <- struct{}{}:
+						default:
+						}
 					}
 				}
 			}
@@ -134,6 +140,10 @@ func Run(o Options) (code int, err error) {
 			return 0, nil
 		case <-p.Done():
 			return p.ExitCode(), nil
+		case <-redraw:
+			w, h := term.Size()
+			_ = term.Scr.Resize(w, h) // Resize erases, forcing a full repaint
+			mark()
 		case <-winch:
 			w, h := term.Size()
 			_ = term.Scr.Resize(w, h)
@@ -166,7 +176,7 @@ func (s statusBar) draw(scr uv.Screen, y, width int) {
 	style := uv.Style{Attrs: uv.AttrReverse}
 	left := fmt.Sprintf(" dozer %s │ emu: %s │ C-%c q: quit ", s.version, s.emu, 'a'+s.prefix-1)
 	if s.pending {
-		left = fmt.Sprintf(" dozer %s │ PREFIX │ q: quit  C-%c: literal ", s.version, 'a'+s.prefix-1)
+		left = fmt.Sprintf(" dozer %s │ PREFIX │ q: quit  l: redraw  C-%c: send C-%c ", s.version, 'a'+s.prefix-1, 'a'+s.prefix-1)
 		style.Attrs |= uv.AttrBold
 	}
 	line := left

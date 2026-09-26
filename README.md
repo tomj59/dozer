@@ -4,6 +4,8 @@ A TUI multi-shell for Linux and macOS: one terminal window holding several live 
 
 > **Status: M0 spike.** One full-screen pane is used to validate terminal emulation, input passthrough and rendering. Layouts arrive in M1. See [`docs/SPEC.md`](docs/SPEC.md) for the full design and roadmap.
 
+**New here? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md).**
+
 ## Build
 
 Requires Go 1.24+.
@@ -23,7 +25,7 @@ bin/dozer -x 'tail -f log'   # the pane IS the command
 bin/dozer -emu vt10x         # A/B: the alternative emulator back end
 ```
 
-Prefix key: **Ctrl-a**. `Ctrl-a q` quits, and `Ctrl-a Ctrl-a` sends a literal Ctrl-a to the shell.
+Prefix key: **Ctrl-a**. `Ctrl-a q` quits, `Ctrl-a l` redraws, `Ctrl-a Ctrl-a` sends a literal Ctrl-a, and `Esc` cancels a pending prefix.
 
 ## Layout of the code
 

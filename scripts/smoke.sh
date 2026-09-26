@@ -35,6 +35,9 @@ send C-a
 send 'echo literal-ok' Enter
 check "C-a C-a literal" "literal-ok"
 
+send C-a l
+check "C-a l redraw keeps screen" "literal-ok"
+
 tmux resize-window -t "$S" -x 70 -y 20
 sleep 0.6
 send 'stty size' Enter

@@ -94,6 +94,7 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 | `C-a x` | Kill the pane's process (confirm). The pane stays, showing its exit state. |
 | `C-a t` | Rename the pane title |
 | `C-a s` | Toggle the status bar |
+| `C-a l` | Redraw the whole screen (for example after the host terminal's Cmd-K cleared it) |
 | `C-a ?` | Help overlay |
 | `C-a q` | Quit dozer (confirm) |
 | `C-a C-a` | Send a literal `C-a` to the pane |

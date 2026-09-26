@@ -1,5 +1,7 @@
 # M0 checklist: Mac verification
 
+New to dozer? Read [QUICKSTART.md](QUICKSTART.md) first; it teaches everything this checklist uses.
+
 Goal: confirm DP-2 (emulator = charm vt, raw-key passthrough) on real macOS terminals before M1 builds layouts on top of it. About 15 minutes. Note the terminal app and version for each run.
 
 ## 0. Build
@@ -25,6 +27,8 @@ Report: did `make` and `make test` pass on Go 1.27.1? (Y/N plus any errors)
 | 1.4 | `Ctrl-a` | Status bar shows **PREFIX** | |
 | 1.5 | `Ctrl-a Ctrl-a` while typing a command | The cursor jumps to the start of the line (literal ^A reached the shell) | |
 | 1.6 | Resize the window by dragging | Prompt redraws; `stty size` matches (one row less than the window) | |
+| 1.6b | `Ctrl-a` then `←` | PREFIX clears; nothing like `[D` gets typed | |
+| 1.6c | `Cmd-K`, then `Ctrl-a l` | The screen blanks, then repaints fully | |
 | 1.7 | `Ctrl-a q` | dozer exits and your terminal is exactly as before (no stray colors, cursor visible, typing echoes) | |
 
 ## 2. Full-screen apps
