@@ -89,6 +89,7 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	pane.Version = version
 	if *showVer {
 		fmt.Println("dozer", version)
 		return

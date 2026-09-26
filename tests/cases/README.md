@@ -16,14 +16,15 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 
 | ID | Case | Milestone | Result |
 |---|---|---|---|
-| C01 | [run: vs exec:](C01-run-vs-exec.sh) | M1 | |
+| C01 | [run: vs exec:](C01-run-vs-exec.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | C02 | [Per-pane cwd and env](C02-cwd-env.sh) | M1 | |
+| C03 | [Panes don't inherit the host terminal's identity](C03-env-isolation.sh) | M2 | |
 
 ## D: Dead panes & lifecycle
 
 | ID | Case | Milestone | Result |
 |---|---|---|---|
-| D01 | [Dead-pane states and chrome](D01-dead-states.sh) | M1 | |
+| D01 | [Dead-pane states and chrome](D01-dead-states.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | D02 | [Restoring dead panes (r / R)](D02-restore.sh) | M1 | |
 | D03 | [Automatic restart with back-off](D03-auto-restart.sh) | M1 | |
 | D04 | [Kill a pane (x)](D04-kill.sh) | M2 | |

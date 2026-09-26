@@ -82,6 +82,47 @@ func (s Spec) Label() string {
 	return filepath.Base(s.shell())
 }
 
+// Version is reported to programs in panes as TERM_PROGRAM_VERSION.
+var Version = "dev"
+
+// hostTerminalVars identify the terminal *dozer* runs in. Inside a pane,
+// dozer is the terminal, so they must not leak through. For example,
+// Terminal.app's TERM_SESSION_ID makes every pane's zsh restore and save
+// the same window session ("Restored session: …"), and TMUX would make
+// programs think they are inside tmux.
+var hostTerminalVars = map[string]bool{
+	"TERM_PROGRAM": true, "TERM_PROGRAM_VERSION": true, "TERM_SESSION_ID": true,
+	"LC_TERMINAL": true, "LC_TERMINAL_VERSION": true, "ITERM_SESSION_ID": true, "ITERM_PROFILE": true,
+	"TMUX": true, "TMUX_PANE": true, "STY": true, "WINDOW": true,
+	"KITTY_WINDOW_ID": true, "KITTY_PID": true, "KITTY_LISTEN_ON": true, "KITTY_PUBLIC_KEY": true,
+	"WEZTERM_PANE": true, "WEZTERM_UNIX_SOCKET": true, "WEZTERM_EXECUTABLE": true,
+	"ALACRITTY_WINDOW_ID": true, "ALACRITTY_SOCKET": true, "ALACRITTY_LOG": true,
+	"VTE_VERSION": true, "WT_SESSION": true, "WT_PROFILE_ID": true,
+	"GHOSTTY_RESOURCES_DIR": true, "GHOSTTY_BIN_DIR": true, "GHOSTTY_SHELL_INTEGRATION_NO_SUDO": true,
+	"TERMINAL_EMULATOR": true, "KONSOLE_VERSION": true, "KONSOLE_DBUS_SESSION": true,
+	"TERM": true, "COLORTERM": true, "DOZER": true, "DOZER_PANE": true,
+}
+
+// ChildEnv builds a pane's environment from dozer's own: host-terminal
+// variables removed, dozer's terminal identity added.
+func ChildEnv(env []string, id int) []string {
+	out := make([]string, 0, len(env)+7)
+	for _, kv := range env {
+		k, _, _ := strings.Cut(kv, "=")
+		if !hostTerminalVars[k] {
+			out = append(out, kv)
+		}
+	}
+	return append(out,
+		"TERM=xterm-256color",
+		"COLORTERM=truecolor",
+		"TERM_PROGRAM=dozer",
+		"TERM_PROGRAM_VERSION="+Version,
+		"DOZER=1",
+		"DOZER_PANE="+strconv.Itoa(id),
+	)
+}
+
 // State is a pane's lifecycle state.
 type State int
 
@@ -145,13 +186,7 @@ func (p *Pane) startLocked() error {
 	argv := p.Spec.Argv()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = p.Spec.Dir
-	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-		"COLORTERM=truecolor",
-		"DOZER=1",
-		"DOZER_PANE="+strconv.Itoa(p.ID),
-	)
-	cmd.Env = append(cmd.Env, p.Spec.Env...)
+	cmd.Env = append(ChildEnv(os.Environ(), p.ID), p.Spec.Env...)
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(p.cols), Rows: uint16(p.rows)})
 	if err != nil {
 		_ = em.Close()

@@ -142,3 +142,19 @@ func TestKill(t *testing.T) {
 		t.Errorf("signal=%q restartPending=%v, want SIGKILL and no auto restart", s.Signal, s.RestartPending)
 	}
 }
+
+func TestChildEnv(t *testing.T) {
+	env := ChildEnv([]string{"HOME=/h", "TERM=screen", "TERM_PROGRAM=Apple_Terminal",
+		"TERM_SESSION_ID=abc", "TMUX=/tmp/x", "ITERM_SESSION_ID=w0", "PATH=/bin"}, 4)
+	got := strings.Join(env, " ")
+	for _, want := range []string{"HOME=/h", "PATH=/bin", "TERM=xterm-256color", "TERM_PROGRAM=dozer", "DOZER_PANE=4"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %s in %s", want, got)
+		}
+	}
+	for _, bad := range []string{"TERM=screen", "Apple_Terminal", "TERM_SESSION_ID", "TMUX=", "ITERM_SESSION_ID"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("%s leaked into %s", bad, got)
+		}
+	}
+}

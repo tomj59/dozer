@@ -378,7 +378,7 @@ Input fidelity (decided in M0, DP-2): the prefix state machine sees raw input by
 
 Bracketed-paste content is never scanned for the prefix. Mouse reports will need translating from screen to pane coordinates once there's more than one pane (M1/M4).
 
-Environment for child processes: `TERM=xterm-256color`, `COLORTERM=truecolor`, `DOZER=1`, `DOZER_PANE=<id>`, `DOZER_NAME`, `DOZER_DESCRIPTION`.
+Environment for child processes: `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=dozer`, `TERM_PROGRAM_VERSION`, `DOZER=1`, `DOZER_PANE=<id>`, `DOZER_NAME`, `DOZER_DESCRIPTION`. Variables that identify the *host* terminal are removed: `TERM_SESSION_ID`, `ITERM_SESSION_ID`, `LC_TERMINAL`, `TMUX`, `STY`, and the kitty, WezTerm, Alacritty, VTE, Windows Terminal, Ghostty and Konsole ones. Inside a pane, dozer is the terminal. (Found in Mac testing: Terminal.app's `TERM_SESSION_ID` made every pane's zsh restore and save the same window session.)
 
 ## 7. Extensibility points
 
