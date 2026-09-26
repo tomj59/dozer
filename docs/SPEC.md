@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.5 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.6 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -22,6 +22,8 @@ A bare `dozer` launches the default 3-pane layout with an interactive `$SHELL` i
 | Pane set | **Built once, at launch** | The pane set is fixed after startup: no adding, splitting or closing panes. Existing split sizes can still be adjusted at runtime (for example 30%\|70% → 50%\|50%). |
 | Multi-input | **A modal input state** you enter and leave deliberately, like modes in vim | dozer warns once per session, the first time you enter the mode, and stays quiet after you accept. The warning can be turned off (§4.7). If you turn it off, dozer doesn't argue. |
 | `--save` | **Saves configuration only**: layout, sizes, titles, flags, display prefs, and each pane's launch command. It never saves process state, history or remote session state. **Stubbed in v1.** | Only a handful of settings can change after launch (§4.8), so there's little runtime change to save. Revisit once real use shows the runtime settings are worth capturing. |
+| Pane lifecycle | **The layout is permanent; dead panes stay put, are flagged loudly, and the user restores them** (§4.10) | dozer's job is to keep a multi-shell skeleton. An exit, crash or dropped ssh session must never collapse or rearrange the layout. Restoring is the user's call (`C-a r`); dozer's job is to make a dead pane impossible to miss. Automatic restart is opt-in per pane (`restart:`). |
+| Quitting | **dozer quits only when you tell it to** (`C-a q`), never because panes exited, even the last one | One rule for every layout. A stray `exit` or a crash can't throw away your arrangement. A single-pane dozer is an outlier use, so it follows the same rule rather than getting an exception. `quit_when_all_exited: true` (config, and a flag) opts into the old behavior. |
 | Small terminals | **Provisional: panes keep a minimum size and the canvas scrolls** | Tune during functional review. See DP-1 in §10. |
 | Name | **dozer** | Win-*dows* meets construction equipment. The binary, module and config paths all use it. |
 | Pane borders | **Thin, shared one-line dividers** (tmux-style) | Maximizes pane space. Pane titles sit inline in the divider above each pane, and the focused pane's divider is highlighted. |
@@ -72,7 +74,7 @@ A "square" pane isn't guaranteed. Terminal cells are about 1:2 (width:height), s
 | Key | Meaning |
 |---|---|
 | `run: <cmd>` | Runs `$SHELL -ic '<cmd>; exec $SHELL'`: the command runs in an interactive shell, and when it ends you're back at a prompt in that pane. The command doesn't land in shell history (DP-4). **Default for `-p`.** |
-| `exec: <cmd>` | The pane process *is* `$SHELL -lc "<cmd>"`. On exit the pane shows `[exited N] r=restart x=close`. |
+| `exec: <cmd>` | The pane process *is* `$SHELL -lc "<cmd>"`. When it ends, the pane becomes a dead pane (§4.10). |
 | (neither) | Plain interactive `$SHELL`. |
 
 Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exec only), `readonly` (ignores input unless unlocked), `group` (multi-input target group), `min: {w, h}`.
@@ -90,8 +92,9 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 | `C-a m` | Enter multi-input mode for the focused pane's group |
 | `C-a M` | Enter multi-input mode for all panes |
 | `C-a Esc` | Leave multi-input mode |
-| `C-a r` | Restart the pane's process (the pane itself stays) |
-| `C-a x` | Kill the pane's process (confirm). The pane stays, showing its exit state. |
+| `C-a r` | Restart the focused pane's process with its launch command (works on live panes too) |
+| `C-a R` | Restart every dead pane |
+| `C-a x` | Kill the pane's process (confirm). The pane stays, as a dead pane. |
 | `C-a t` | Rename the pane title |
 | `C-a s` | Toggle the status bar |
 | `C-a l` | Redraw the whole screen (for example after the host terminal's Cmd-K cleared it) |
@@ -113,7 +116,7 @@ All of these can be remapped in the config.
 
 - Borders are thin one-line dividers shared between neighboring panes. Each pane's divider shows `[N] title`. The default title is the command, or an OSC-set title if the program sets one. Exit codes are shown too.
 - The focused pane has a highlighted border.
-- A one-line status bar shows the profile name, the current input mode, the prefix-pending indicator, zoom state, and the clock.
+- A one-line status bar shows the profile name, the current input mode, the prefix-pending indicator, zoom state, a **dead-pane count** (for example `✖ 2 dead · C-a R`) when any pane is dead, and the clock.
 
 ### 4.7 Input modes
 
@@ -174,6 +177,36 @@ Scope, now and later: **configuration only**. dozer never tries to restore proce
 - **Later (runtime save):** `C-a S` writes the same YAML with the current values of controls 1–3 from §4.8 merged in. This is deferred until real use shows runtime tuning is worth capturing.
 - Both paths use the same serializer. The only difference is whether the runtime deltas get merged in.
 
+### 4.10 Pane lifecycle and dead panes
+
+A pane's **slot** in the layout is permanent for the whole session. Only the **process** inside it comes and goes.
+
+| State | Meaning | How it looks |
+|---|---|---|
+| **Running** | The process is alive | Normal divider and title |
+| **Exited** | The process ended with status 0 | Dimmed divider; title `[N] title · exited` |
+| **Failed** | Non-zero status, or killed by a signal | Red divider; title `[N] title · ✖ exit 1` or `✖ SIGKILL` |
+| **Disconnected** | Heuristic: the command was `ssh …` and it exited 255 | Red divider; title `[N] title · ✖ connection lost` |
+
+When a pane dies:
+
+1. Its last screen stays visible but dimmed, so you can see what happened (the error message, or the ssh "Connection closed" line).
+2. A one-line banner at the bottom of the pane reads: `✖ exited 1 at 14:02:31 · C-a r restart`.
+3. The status bar shows the dead-pane count, so a dead pane outside your focus (or zoomed out of view) is still noticed.
+4. Nothing else changes: neighbors keep their size and the layout keeps its shape.
+
+**Restoring:**
+
+- `C-a r` re-runs the pane's *launch* command (its `run:`/`exec:`, cwd and env) in the same slot at the same size.
+- `C-a R` restores every dead pane at once.
+- The restarted pane starts on a fresh screen; the dead output is discarded (scrollback, M4, may keep it later).
+
+**Automatic restart** (`restart: on-failure|always`) stays opt-in per pane, for panes like `tail -F` or a dashboard. Automatic restarts use a back-off (1 s, 2 s, 4 s … capped at 30 s), so a crash-looping command can't spin.
+
+**Quitting:** dozer never exits because panes died, even when all of them are dead. It shows every dead pane and waits for `C-a r`/`C-a R`/`C-a q`. `C-a q` asks for confirmation (§4.4) when any pane is still running. Restoring the whole arrangement after quitting dozer means relaunching with the same flags or profile. That's exactly what a profile or `--save` (§4.9) is for.
+
+> **M0 note:** the spike still quits when its single shell exits. This section is implemented in M2.
+
 ## 5. Configuration (YAML)
 
 Locations: `-c <file>`, otherwise `./.dozer.yaml`, otherwise `~/.config/dozer/config.yaml` (XDG). CLI flags override the file.
@@ -206,6 +239,7 @@ multi_input:
   warn: true               # false = never confirm (same as --suppress-multi-warn)
 
 min_pane: { w: 20, h: 5 }  # provisional default, see DP-1
+quit_when_all_exited: false  # default: dozer stays open with dead panes (§4.10)
 
 panes:
   api:  { title: API,  run: "ssh api-1", group: hosts }
@@ -289,7 +323,7 @@ These are designed in from the start, even where v1 uses only one implementation
 |---|---|
 | **M0 Spike** (Linux ✅, Mac pending) | One pane in full screen, driven through the chosen emulator. Pass criteria: vim, htop, and `less` all work, resize is correct, `cat` of a large file stays smooth. Decide the emulator library and the input approach. |
 | **M1 Layouts** | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`, piped input, borders. |
-| **M2 Control** | Prefix FSM, focus, zoom, keyboard resize, quit/kill/restart, exit-state display. |
+| **M2 Control** | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
 | **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
