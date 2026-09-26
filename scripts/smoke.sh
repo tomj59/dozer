@@ -138,7 +138,7 @@ send C-a x
 check "kill asks" "Kill \[2\]"
 send y
 sleep 0.5
-check "killed pane flagged" "✖ SIGHUP"
+check "killed pane flagged" "✖ killed"
 send C-a r
 sleep 0.5
 send 'exit' Enter

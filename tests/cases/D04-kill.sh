@@ -1,5 +1,5 @@
 #!/bin/sh
-# D04-kill: a dozer workspace, packaged by dozer 849a950-dirty on 2026-09-26.
+# D04-kill: a dozer workspace, packaged by dozer 7cca6f7-dirty on 2026-09-26.
 # Self-contained: the configuration is inside this script and is piped
 # straight to dozer (dozer -c -). Nothing else is read or written.
 #
@@ -21,7 +21,8 @@
 #
 # Expect:
 #   - 'n' leaves it running.
-#   - 'y' kills it: '✖ SIGHUP', no automatic restart even though restart: always.
+#   - 'y' kills it: the title says '✖ killed (…)' with how it ended (zsh catches the hang-up and exits 1; others show SIGHUP or SIGKILL).
+#   - No automatic restart, even though the pane has restart: always.
 #   - r brings it back.
 #
 # Record: PASS / FAIL + notes (terminal app, screenshot if visual).
@@ -40,7 +41,8 @@ description: |
 
   Expect:
     - 'n' leaves it running.
-    - 'y' kills it: '✖ SIGHUP', no automatic restart even though restart: always.
+    - 'y' kills it: the title says '✖ killed (…)' with how it ended (zsh catches the hang-up and exits 1; others show SIGHUP or SIGKILL).
+    - No automatic restart, even though the pane has restart: always.
     - r brings it back.
 
   Record: PASS / FAIL + notes (terminal app, screenshot if visual).

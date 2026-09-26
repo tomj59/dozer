@@ -196,6 +196,7 @@ A pane's **slot** in the layout is permanent for the whole session. Only the **p
 | **Running** | The process is alive | Normal divider and title |
 | **Exited** | The process ended with status 0 | Dimmed divider; title `[N] title · exited` |
 | **Failed** | Non-zero status, or killed by a signal | Red divider; title `[N] title · ✖ exit 1` or `✖ SIGKILL` |
+| **Killed** | Ended by `C-a x` | Red divider; title `✖ killed (exit 1)` or `✖ killed (SIGKILL)`. Shells catch the hang-up and exit with their own status (zsh exits 1), so without this it would read as a crash (found in D04). |
 | **Disconnected** | Heuristic: the command was `ssh …` and it exited 255 | Red divider; title `[N] title · ✖ connection lost` |
 
 When a pane dies:

@@ -169,6 +169,7 @@ type Pane struct {
 	startedAt time.Time   // when the current process started
 	gaveUp    bool        // hit MaxRestarts; waits for a manual restart
 	noRestart bool        // killed on purpose: skip automatic restart once
+	killed    bool        // the current death was C-a x (shown as "killed")
 	timer     *time.Timer // pending automatic restart
 }
 
@@ -210,7 +211,7 @@ func (p *Pane) startLocked() error {
 	}
 	p.gen++
 	p.em, p.ptmx, p.cmd = em, ptmx, cmd
-	p.state, p.code, p.signal, p.gaveUp = Running, 0, "", false
+	p.state, p.code, p.signal, p.gaveUp, p.killed = Running, 0, "", false, false
 	p.startedAt = time.Now()
 	gen := p.gen
 	go func() { _, _ = io.Copy(ptmx, em.Replies()) }() // DA/DSR replies to the child
@@ -286,6 +287,7 @@ func (p *Pane) exitedLocked(werr error) {
 
 	// Opt-in automatic restart with back-off: 1s, 2s, 4s … capped at 30s.
 	pol := p.Spec.Restart
+	p.killed = p.noRestart
 	if p.noRestart {
 		pol, p.noRestart = RestartNever, false
 	}
@@ -415,6 +417,7 @@ type Snapshot struct {
 	Restarts         int // automatic restarts so far (in the current streak)
 	MaxRestarts      int // the limit (-1 = unlimited)
 	GaveUp           bool
+	Killed           bool // ended by C-a x, however the program reported it
 }
 
 // Draw paints the pane's screen into area and returns its state.
@@ -422,7 +425,7 @@ func (p *Pane) Draw(dst uv.Screen, area uv.Rectangle) Snapshot {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	s := Snapshot{State: p.state, Code: p.code, Signal: p.signal, ExitedAt: p.exitedAt, RestartPending: p.timer != nil,
-		Restarts: p.restarts, MaxRestarts: p.maxRestarts(), GaveUp: p.gaveUp}
+		Restarts: p.restarts, MaxRestarts: p.maxRestarts(), GaveUp: p.gaveUp, Killed: p.killed}
 	if p.em == nil {
 		return s
 	}

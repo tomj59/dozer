@@ -138,7 +138,7 @@ func TestKill(t *testing.T) {
 	p.Kill(300 * time.Millisecond) // ignores HUP → SIGKILL after grace
 	waitFor(t, "kill", p.Dead)
 	_, s := draw(p, 20, 3)
-	if s.Signal != "SIGKILL" || s.RestartPending {
+	if s.Signal != "SIGKILL" || s.RestartPending || !s.Killed {
 		t.Errorf("signal=%q restartPending=%v, want SIGKILL and no auto restart", s.Signal, s.RestartPending)
 	}
 }

@@ -152,6 +152,15 @@ func put(cv uv.Screen, x, y, maxX int, s string, st uv.Style) int {
 }
 
 func stateText(s pane.Snapshot) string {
+	// A pane killed with C-a x says so: shells catch SIGHUP and exit with
+	// their own status (zsh exits 1), which would otherwise read as a crash.
+	if s.Killed && s.State.Dead() {
+		how := fmt.Sprintf("exit %d", s.Code)
+		if s.Signal != "" {
+			how = s.Signal
+		}
+		return "✖ killed (" + how + ")"
+	}
 	switch s.State {
 	case pane.Exited:
 		return "exited"
