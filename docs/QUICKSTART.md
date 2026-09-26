@@ -107,7 +107,7 @@ bin/dozer --check examples/tree.yaml    # validate + show what would launch, wit
 ### Saving and sharing a setup
 
 - `--save my.yaml` writes what you launched as an editable YAML file: your work-in-progress copy.
-- `--package my-tool` writes **`my-tool.sh`**, a runnable script with the config inside. Copy it to another folder or send it to someone who has dozer, and `./my-tool.sh` recreates the workspace. There's no separate YAML to keep in sync.
+- `--package my-tool` writes **`my-tool.sh`**, one self-contained script with the config inside. When run, it checks that dozer is installed and pipes its config straight in (`dozer -c -`). No other files are needed, so you can copy it anywhere or send it to anyone who has dozer.
 
 ```sh
 bin/dozer -c examples/dev.yaml --package dev-ws     # → ./dev-ws.sh
@@ -115,7 +115,9 @@ bin/dozer -c examples/dev.yaml --package dev-ws     # → ./dev-ws.sh
 ./dev-ws.sh --show-config                           # see the config inside
 ```
 
-A package needs `dozer` on your PATH. While testing from the repo, run `DOZER_BIN=$PWD/bin/dozer ./dev-ws.sh`, or copy `bin/dozer` into a folder on your PATH.
+Relative `cwd` paths in a package resolve against the folder you run it from; `~` and `$HOME` resolve for whoever runs it. A package needs `dozer` on your PATH. While testing from the repo, run `DOZER_BIN=$PWD/bin/dozer ./dev-ws.sh`, or copy `bin/dozer` into a folder on your PATH.
+
+A config doesn't need to be a file at all: `dozer -c - < ws.yaml` reads it from stdin, and `dozer --config-text '{"layout":"3"}'` takes YAML or JSON as an argument.
 
 To reuse a config as a **profile**, copy it to `~/.config/dozer/NAME.yaml` and run `dozer NAME`. A `.dozer.yaml` in the current folder, or `~/.config/dozer/config.yaml`, is loaded automatically by a bare `dozer`.
 

@@ -10,26 +10,28 @@ import (
 
 func TestPackageRoundTripAndRun(t *testing.T) {
 	dir := t.TempDir()
-	c, err := Parse([]byte("layout: \"2,1\"\npanes: [{run: htop, cwd: sub}, {exec: 'echo \"$HOME\" `x`'}]\n"), dir)
+	src := "layout: \"2,1\"\ncwd: ~/work\nenv: {A: $HOME}\npanes: [{run: htop, cwd: sub}, {exec: 'echo \"$HOME\" `x`'}]\n"
+	c, err := Parse([]byte(src), dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	script, err := c.Package("my-tool", dir, "test", "2026-01-01")
+	script, err := c.Package("my-tool", "test", "2026-01-01")
 	if err != nil {
 		t.Fatal(err)
+	}
+	y, ok := Unpack(script)
+	if !ok {
+		t.Fatal("Unpack failed")
+	}
+	// Written as authored, not as expanded on this machine.
+	for _, want := range []string{"cwd: ~/work", "{A: $HOME}", "cwd: sub", "name: my-tool"} {
+		if !strings.Contains(string(y), want) {
+			t.Errorf("embedded YAML lacks %q:\n%s", want, y)
+		}
 	}
 	path := filepath.Join(dir, "my-tool.sh")
 	if err := os.WriteFile(path, script, 0o755); err != nil {
 		t.Fatal(err)
-	}
-
-	// dozer reads the package directly (Unpack), relative to its folder.
-	c2, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c2.Name != "my-tool" || c2.Panes[0].Dir != filepath.Join(dir, "sub") || c2.Panes[1].Exec != `echo "$HOME" `+"`x`" {
-		t.Errorf("unpacked: name=%q dir=%q exec=%q", c2.Name, c2.Panes[0].Dir, c2.Panes[1].Exec)
 	}
 
 	// --show-config prints exactly the embedded YAML (no shell expansion).
@@ -37,14 +39,16 @@ func TestPackageRoundTripAndRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	y, _ := Unpack(script)
 	if string(out) != string(y) {
 		t.Errorf("--show-config:\n%s\nwant:\n%s", out, y)
 	}
 
-	// Running it execs dozer with the config on fd 3 and passes flags on.
+	// Running it pipes the YAML to `dozer -c -` and passes flags on. Tests
+	// have no terminal, so disable the script's terminal check for this run.
 	fake := filepath.Join(dir, "fake-dozer")
-	os.WriteFile(fake, []byte("#!/bin/sh\necho \"ARGS: $*\"\ncat /dev/fd/3\n"), 0o755)
+	os.WriteFile(fake, []byte("#!/bin/sh\necho \"ARGS: $*\"\ncat\n"), 0o755)
+	body := strings.Replace(string(script), "if [ ! -t 1 ]; then", "if false; then", 1)
+	os.WriteFile(path, []byte(body), 0o755)
 	cmd := exec.Command("sh", path, "--prefix", "C-b")
 	cmd.Env = append(os.Environ(), "DOZER_BIN="+fake)
 	out, err = cmd.Output()
@@ -52,36 +56,39 @@ func TestPackageRoundTripAndRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(out)
-	if !strings.HasPrefix(got, "ARGS: --base "+dir+" -c /dev/fd/3 --prefix C-b\n") {
+	if !strings.HasPrefix(got, "ARGS: -c - --prefix C-b\n") {
 		t.Errorf("args: %q", strings.SplitN(got, "\n", 2)[0])
 	}
-	if !strings.Contains(got, strings.TrimSpace(string(y))) {
-		t.Errorf("fd 3 content:\n%s", got)
+	if strings.SplitN(got, "\n", 2)[1] != string(y) {
+		t.Errorf("stdin content:\n%s\nwant:\n%s", got, y)
 	}
-	c3, err := Parse([]byte(got[strings.Index(got, "\n")+1:]), dir)
+	// And it loads back to the same launch.
+	c2, err := Parse(y, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c3.Source = c2.Source
-	if c3.Describe() != c2.Describe() {
-		t.Errorf("config via fd 3 differs:\n%s\nvs\n%s", c3.Describe(), c2.Describe())
+	c.Name, c.Source = "my-tool", ""
+	if c2.Describe() != c.Describe() {
+		t.Errorf("round trip differs:\n%s\nvs\n%s", c2.Describe(), c.Describe())
 	}
 }
 
-func TestPortablePath(t *testing.T) {
-	cases := map[string]string{
-		"/pkg/dir":       ".",
-		"/pkg/dir/sub/x": "./sub/x",
-		"/home/u":        "~",
-		"/home/u/work":   "~/work",
-		"/etc/other":     "/etc/other",
-		"relative/stays": "relative/stays",
-		"":               "",
+func TestPackageNeedsTerminalAndDozer(t *testing.T) {
+	c, _ := Parse([]byte(`layout: "1"`), "")
+	script, _ := c.Package("t", "test", "today")
+	path := filepath.Join(t.TempDir(), "t.sh")
+	os.WriteFile(path, script, 0o755)
+	cmd := exec.Command("sh", path)
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "DOZER_BIN=/nonexistent/dozer"}
+	out, err := cmd.CombinedOutput()
+	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 127 || !strings.Contains(string(out), "needs dozer") {
+		t.Errorf("missing dozer: err=%v out=%q", err, out)
 	}
-	for in, want := range cases {
-		if got := portablePath(in, "/pkg/dir", "/home/u"); got != want {
-			t.Errorf("portablePath(%q) = %q, want %q", in, got, want)
-		}
+	cmd = exec.Command("sh", path) // stdout is a pipe here, not a terminal
+	cmd.Env = append(os.Environ(), "DOZER_BIN=/bin/true")
+	out, _ = cmd.CombinedOutput()
+	if !strings.Contains(string(out), "needs to run in a terminal") {
+		t.Errorf("no-terminal check: %q", out)
 	}
 }
 

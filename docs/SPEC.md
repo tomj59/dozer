@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.10 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.11 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -24,7 +24,7 @@ A bare `dozer` launches the default 3-pane layout with an interactive `$SHELL` i
 | `--save` | **Saves configuration only**: layout, sizes, titles, flags, display prefs, and each pane's launch command. It never saves process state, history or remote session state. **Stubbed in v1.** | Only a handful of settings can change after launch (§4.8), so there's little runtime change to save. Revisit once real use shows the runtime settings are worth capturing. |
 | Pane lifecycle | **The layout is permanent; dead panes stay put, are flagged loudly, and the user restores them** (§4.10) | dozer's job is to keep a multi-shell skeleton. An exit, crash or dropped ssh session must never collapse or rearrange the layout. Restoring is the user's call (`C-a r`); dozer's job is to make a dead pane impossible to miss. Automatic restart is opt-in per pane (`restart:`). |
 | Quitting | **dozer quits only when you tell it to** (`C-a q`), never because panes exited, even the last one | One rule for every layout. A stray `exit` or a crash can't throw away your arrangement. A single-pane dozer is an outlier use, so it follows the same rule rather than getting an exception. `quit_when_all_exited: true` (config, and a flag) opts into the old behavior. |
-| Config forms | **YAML is the working copy; a package is the release** (§4.12) | `--save` and YAML files are the editable, work-in-progress form you iterate on. `--package NAME` freezes a config into one runnable `NAME.sh` that embeds it. You can copy it between folders or share it, and there's no separate YAML to drift out of sync. |
+| Config forms | **YAML is the working copy; a package is the release** (§4.12) | `--save` and YAML files are the editable, work-in-progress form you iterate on. `--package NAME` freezes a config into one self-contained `NAME.sh` that pipes its embedded YAML to `dozer -c -`. No other files are involved, and paths aren't tied to any machine. |
 | Small terminals | **Provisional: panes keep a minimum size and the canvas scrolls** | Tune during functional review. See DP-1 in §10. |
 | Name | **dozer** | Win-*dows* meets construction equipment. The binary, module and config paths all use it. |
 | Pane borders | **Thin, shared one-line dividers** (tmux-style) | Maximizes pane space. Pane titles sit inline in the divider above each pane, and the focused pane's divider is highlighted. |
@@ -55,6 +55,9 @@ dozer -c ops.yaml                     # load a config file
 dozer ops                             # load profile ~/.config/dozer/ops.yaml
 printf 'ssh a\nssh b\nhtop\n' | dozer # piped: one pane command per line
 dozer -p a -p b -p c -p d            # no -l: the layout is fitted to the commands (4 → 2,2)
+dozer -c - < ws.yaml                  # config from stdin (YAML or JSON)
+dozer --config-text '{"layout":"3"}'  # config as an argument
+./my-tool.sh                          # a packaged workspace (§4.12)
 ```
 
 Piped input is read to EOF, then dozer reopens `/dev/tty` for interactive input.
@@ -242,34 +245,36 @@ Scheduled after M5; see the roadmap. Nothing is exposed in the config yet.
 
 ### 4.12 Packaged workspaces (`--package`)
 
-`dozer <flags or -c file> --package my-tool` writes **`my-tool.sh`**: a POSIX `sh` script with the resolved config embedded in it. It is the frozen, shareable form of a workspace.
+`dozer <flags or -c file> --package my-tool` writes **`my-tool.sh`**, one self-contained POSIX `sh` script. **The script is the whole package.** It carries its configuration inside, and running it reads and writes no other files. It does three things:
+
+1. **Checks the environment:** a `dozer` binary is on `PATH` (or at `$DOZER_BIN`), and it's running in a terminal.
+2. **Checks for dozer:** if dozer is missing, it prints where to get it and exits 127.
+3. **Runs:** `yaml | dozer -c - "$@"`. The embedded YAML is piped into dozer, which is the same as `dozer -c - < config.yaml`. dozer then reads the keyboard from the terminal (`/dev/tty`).
 
 | Command | Does |
 |---|---|
-| `./my-tool.sh` | Launches dozer with the embedded config |
+| `./my-tool.sh` | Launches the workspace |
 | `./my-tool.sh --prefix C-b` | Passes extra flags through to dozer |
 | `./my-tool.sh --show-config` | Prints the embedded YAML |
-| `dozer --check my-tool.sh`, `dozer -c my-tool.sh` | dozer reads a package directly, the same as a YAML file |
+| `dozer --check -c - < my-tool.sh`, `dozer -c my-tool.sh` | dozer also reads a package as a config source |
 
-To change a package, unpack it, edit, and repackage: `./my-tool.sh --show-config > my-tool.yaml`, edit that file, then `dozer -c my-tool.yaml --package my-tool.sh`.
+To change a package: `./my-tool.sh --show-config > my-tool.yaml`, edit, then `dozer -c my-tool.yaml --package my-tool.sh`.
 
-**How it's built:**
+**No filesystem assumptions:**
 
-- The YAML sits in a quoted heredoc inside a shell function, so it's never shell-expanded.
-- The script `exec`s `dozer --base <script folder> -c /dev/fd/3 "$@"`, with the YAML fed on file descriptor 3. The keyboard stays on stdin.
-- It needs only POSIX `sh` and `/dev/fd`, which both Linux and macOS have.
-- The script's name, minus `.sh`, becomes the workspace `name` shown in the status bar.
+- The script never refers to its own location.
+- cwd and env are embedded **exactly as written** (`sub`, `~/work`, `$HOME`), not as expanded on the packaging machine, and they resolve when the script runs.
+- A relative `cwd` resolves against the folder you run the script from. `~` and `$VARS` resolve for whoever runs it.
+- Only absolute paths the author wrote stay absolute.
 
-**Portability:**
+**Inline equivalents** (the same config-without-a-file path the package uses):
 
-- cwd paths inside the package's folder are written relative to the script (`./logs`), and they resolve against wherever the script is run from.
-- Paths under `$HOME` are written as `~/…`, so they resolve for whoever runs it.
-- Anything else stays absolute.
-- `env` values are stored as resolved at packaging time.
+- `dozer -c -` reads YAML (or JSON, which is a subset of YAML) from stdin.
+- `dozer --config-text '{"layout":"2,1","panes":[{"run":"htop"}]}'` takes it as an argument.
 
-**Safety:** `--package` overwrites only files that are already dozer packages; it refuses to overwrite any other script.
+**Safety:** `--package` overwrites only files that are already dozer packages; it refuses to overwrite any other script. The YAML sits in a quoted heredoc, so the shell never expands it.
 
-**Dependency:** the script needs a `dozer` binary on `PATH`, or at `$DOZER_BIN`. If neither is there, it prints where to get dozer and exits 127. See DP-6 for making packages fully standalone.
+**Dependency:** dozer itself. See DP-6 for making packages carry it.
 
 ## 5. Configuration (YAML)
 

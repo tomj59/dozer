@@ -7,9 +7,10 @@ make build >/dev/null || exit 1
 EMU=${EMU:-charm}
 export LANG=${LANG:-C.UTF-8}
 BASE=dozer-smoke-$$
+PKGDIR=$(mktemp -d)
 S=$BASE
 fail=0
-cleanup() { for s in $BASE $BASE-1 $BASE-q; do tmux kill-session -t "$s" 2>/dev/null; done; }
+cleanup() { rm -rf "$PKGDIR"; for s in $BASE $BASE-1 $BASE-q $BASE-p; do tmux kill-session -t "$s" 2>/dev/null; done; }
 trap cleanup EXIT
 
 start() { # session, width, height, dozer args...
@@ -145,5 +146,17 @@ sleep 0.5
 if tmux has-session -t "$S" 2>/dev/null; then ok "dozer stays when panes exit"; else bad "dozer stays when panes exit"; fi
 check "exited pane flagged" "exited"
 quit
+
+# --- packaged workspace: config piped on stdin, keyboard from the tty ----
+printf 'layout: "2"\npanes: [{title: one, cwd: sub}, {title: two}]\n' | bin/dozer -c - --package "$PKGDIR/ws" >/dev/null 2>&1
+mkdir -p "$PKGDIR/run/sub"
+S=$BASE-p
+tmux new-session -d -s "$S" -x 90 -y 20 "cd $PKGDIR/run && env DOZER_BIN=$PWD/bin/dozer SHELL=/bin/bash PS1='$ ' sh $PKGDIR/ws.sh"
+sleep 1.5
+check "package launches with its name" " ws │ \[1\] one"
+send 'pwd' Enter
+check "relative cwd resolves where it runs" "$PKGDIR/run/sub"
+quit
+if tmux has-session -t "$S" 2>/dev/null; then bad "package: keyboard works (C-a q y)"; else ok "package: keyboard works (C-a q y)"; fi
 
 exit $fail

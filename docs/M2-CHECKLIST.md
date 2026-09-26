@@ -27,7 +27,8 @@ cd ~/claude/Projects/tui-multi-shell/dozer && make && make test && bin/dozer
 | P2 | `cd /tmp && DOZER_BIN=~/claude/Projects/tui-multi-shell/dozer/bin/dozer ./dev-ws.sh` | The dev workspace launches; the status bar says `dev-ws` | |
 | P3 | `./dev-ws.sh --show-config` | Prints the YAML | |
 | P4 | `./dev-ws.sh` without dozer on PATH (no DOZER_BIN) | A clear "needs dozer" message, exit 127 | |
-| P5 | A config with `cwd: sub` packaged into a folder, then the script copied elsewhere | The pane starts in `sub/` next to the *copied* script | |
+| P5 | Package a config with `cwd: sub`, then run the script from a folder that has a `sub/` | The pane starts in `sub/` of the folder you ran it from | |
+| P6 | `bin/dozer --check -c - < /tmp/dev-ws.sh` and `bin/dozer --check --config-text '{"layout":"3"}'` | Both print a resolved config (stdin and inline, no file) | |
 | C1 | `status_bar: top` in a config | The bar at the top; panes below it | |
 
 Report: results, plus your feel for the resize step sizes (2 columns / 1 row per press) and the repeat window (0.7 s).

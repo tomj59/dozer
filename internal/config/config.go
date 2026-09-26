@@ -78,13 +78,10 @@ func Defaults() *Config {
 
 // Load reads and resolves a YAML config file, or the config embedded in a
 // packaged dozer script (see Package). Relative cwd paths resolve against
-// the file's folder.
-func Load(path string) (*Config, error) { return LoadFrom(path, "") }
-
-// LoadFrom is Load with an explicit base folder for relative cwd paths
-// ("" = the file's folder). Packaged scripts pass their own folder, since
-// they hand dozer the config on a file descriptor (/dev/fd/3).
-func LoadFrom(path, base string) (*Config, error) {
+// the file's folder. For config text with no file (stdin, --config-text),
+// use Parse with baseDir "": relative paths then resolve against the
+// directory dozer runs in.
+func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -92,10 +89,7 @@ func LoadFrom(path, base string) (*Config, error) {
 	if y, ok := Unpack(data); ok {
 		data = y
 	}
-	if base == "" {
-		base = filepath.Dir(path)
-	}
-	c, err := Parse(data, base)
+	c, err := Parse(data, filepath.Dir(path))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
@@ -184,7 +178,8 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 	}
 
 	// Panes: a list in reading order, or a map keyed by tree pane names.
-	base := pane.Spec{Shell: f.Shell, Dir: expandDir(f.Cwd, baseDir), Env: envList(f.Env)}
+	base := pane.Spec{Shell: f.Shell, Dir: expandDir(f.Cwd, baseDir), Env: envList(f.Env),
+		RawDir: f.Cwd, RawEnv: rawEnvList(f.Env)}
 	for i := range c.Panes {
 		c.Panes[i] = base
 	}
@@ -267,10 +262,11 @@ func decodePane(n *yaml.Node, base pane.Spec, baseDir string) (pane.Spec, []stri
 		s.Shell = pf.Shell
 	}
 	if pf.Cwd != "" {
-		s.Dir = expandDir(pf.Cwd, baseDir)
+		s.Dir, s.RawDir = expandDir(pf.Cwd, baseDir), pf.Cwd
 	}
 	if len(pf.Env) > 0 {
 		s.Env = append(append([]string(nil), base.Env...), envList(pf.Env)...)
+		s.RawEnv = append(append([]string(nil), base.RawEnv...), rawEnvList(pf.Env)...)
 	}
 	return s, warn, nil
 }
@@ -389,6 +385,15 @@ func parseList(list []string) ([]layout.Size, error) {
 		out = append(out, sz)
 	}
 	return out, nil
+}
+
+func rawEnvList(m map[string]string) []string {
+	var out []string
+	for k, v := range m {
+		out = append(out, k+"="+v)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func envList(m map[string]string) []string {

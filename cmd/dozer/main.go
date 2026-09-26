@@ -68,7 +68,7 @@ Flags:
 func main() {
 	var (
 		specs     []pane.Spec
-		cfgFile   = flag.String("c", "", "config `file` (YAML)")
+		cfgFile   = flag.String("c", "", "config `file` (YAML); - reads it from stdin")
 		layoutArg = flag.String("l", "", "layout shorthand, e.g. 2,1 or 2,2,1")
 		heights   = flag.String("heights", "", "row heights, e.g. 60,40 (60 = 60%, also 12c and 2fr)")
 		widths    strList
@@ -77,7 +77,7 @@ func main() {
 		check     = flag.Bool("check", false, "validate and print the resolved configuration, then exit")
 		save      = flag.String("save", "", "write the resolved configuration as YAML to `file` (- = stdout), then exit")
 		pkg       = flag.String("package", "", "write a self-contained, runnable `script` (NAME.sh) with the configuration inside, then exit")
-		base      = flag.String("base", "", "folder that relative cwd paths resolve against (default: the config file's folder; set by packaged scripts)")
+		cfgText   = flag.String("config-text", "", "the configuration itself, as YAML or JSON `text` (instead of a file)")
 		emuName   = flag.String("emu", "charm", fmt.Sprintf("terminal emulator back end %v", emu.Names))
 		showVer   = flag.Bool("version", false, "print version and exit")
 	)
@@ -94,7 +94,7 @@ func main() {
 		return
 	}
 
-	cfg, err := build(*cfgFile, *base, flag.Args(), *layoutArg, *heights, widths, *prefix, *quitAll, specs)
+	cfg, err := build(*cfgFile, *cfgText, flag.Args(), *layoutArg, *heights, widths, *prefix, *quitAll, specs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dozer:", err)
 		os.Exit(2)
@@ -158,16 +158,19 @@ func main() {
 }
 
 // build resolves the launch config: file/profile, then flag overrides.
-func build(cfgFile, base string, args []string, layoutArg, heights string, widths []string,
+func build(cfgFile, cfgText string, args []string, layoutArg, heights string, widths []string,
 	prefix string, quitAll bool, specs []pane.Spec) (*config.Config, error) {
-	if cfgFile != "" && len(args) > 0 {
-		return nil, fmt.Errorf("give either -c FILE or a profile name, not both")
+	if (cfgFile != "" || cfgText != "") && len(args) > 0 {
+		return nil, fmt.Errorf("give either -c FILE, --config-text or a profile name, not several")
+	}
+	if cfgFile != "" && cfgText != "" {
+		return nil, fmt.Errorf("give either -c FILE or --config-text, not both")
 	}
 	if len(args) > 1 {
 		return nil, fmt.Errorf("unexpected arguments %v (quote commands: -p 'git log')", args[1:])
 	}
 	path := cfgFile
-	if path == "" {
+	if path == "" && cfgText == "" {
 		arg := ""
 		if len(args) == 1 {
 			arg = args[0]
@@ -182,16 +185,38 @@ func build(cfgFile, base string, args []string, layoutArg, heights string, width
 		}
 	}
 	cfg := config.Defaults()
-	if path != "" {
-		c, err := config.LoadFrom(path, base)
+	switch {
+	case cfgText != "" || path == "-":
+		// Config with no file behind it: --config-text, or -c - (stdin,
+		// which is how packaged scripts run). Relative cwds resolve against
+		// the directory dozer runs in.
+		data, src := []byte(cfgText), "(--config-text)"
+		if path == "-" {
+			var err error
+			if data, err = io.ReadAll(os.Stdin); err != nil {
+				return nil, err
+			}
+			src = "(stdin)"
+		}
+		if y, ok := config.Unpack(data); ok { // a package piped in: dozer -c - < tool.sh
+			data = y
+		}
+		c, err := config.Parse(data, "")
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", src, err)
+		}
+		c.Source = src
+		cfg = c
+	case path != "":
+		c, err := config.Load(path)
 		if err != nil {
 			return nil, err
 		}
 		cfg = c
 	}
 
-	// Piped stdin: one pane command per line.
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
+	// Piped stdin: one pane command per line (unless it carried the config).
+	if path != "-" && !term.IsTerminal(int(os.Stdin.Fd())) {
 		piped, err := readCommands(os.Stdin)
 		if err != nil {
 			return nil, err
@@ -287,8 +312,7 @@ func writePackage(cfg *config.Config, path string) error {
 			return fmt.Errorf("%s exists and is not a dozer package; not overwriting", path)
 		}
 	}
-	dir := filepath.Dir(path)
-	out, err := cfg.Package(name, dir, version, time.Now().Format("2006-01-02"))
+	out, err := cfg.Package(name, version, time.Now().Format("2006-01-02"))
 	if err != nil {
 		return err
 	}

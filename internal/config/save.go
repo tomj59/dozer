@@ -21,19 +21,20 @@ import (
 // Shorthand-shaped layouts are written as "2,1" plus heights/widths; any
 // other tree is written in tree form, keeping the config's pane names
 // (or p1, p2, … for trees built another way).
-func (c *Config) YAML(header string) ([]byte, error) { return c.yaml(header, nil) }
-
-// yaml renders the config; portable (if non-nil) rewrites each cwd for
-// sharing (see Package).
-func (c *Config) yaml(header string, portable func(string) string) ([]byte, error) {
-	if portable != nil {
-		cp := *c
-		cp.Panes = append([]pane.Spec(nil), c.Panes...)
-		for i := range cp.Panes {
-			cp.Panes[i].Dir = portable(cp.Panes[i].Dir)
+func (c *Config) YAML(header string) ([]byte, error) {
+	// Write cwd and env as the author wrote them ("logs", "~/work", "$HOME"),
+	// not as expanded on this machine.
+	cp := *c
+	cp.Panes = append([]pane.Spec(nil), c.Panes...)
+	for i, p := range cp.Panes {
+		if p.RawDir != "" || p.Dir == "" {
+			cp.Panes[i].Dir = p.RawDir
 		}
-		c = &cp
+		if p.RawEnv != nil || p.Env == nil {
+			cp.Panes[i].Env = p.RawEnv
+		}
 	}
+	c = &cp
 	doc := &yaml.Node{Kind: yaml.MappingNode}
 	add := func(key string, v *yaml.Node) {
 		doc.Content = append(doc.Content, str(key), v)

@@ -31,13 +31,18 @@ const (
 
 // Spec describes what a pane launches. See docs/SPEC.md §4.3.
 type Spec struct {
-	Title   string   // label; default derived from the command
-	Shell   string   // interactive shell; default $SHELL, then /bin/sh
-	Run     string   // run: command in an interactive shell, then a prompt (DP-4)
-	Exec    string   // exec: the pane process is `$SHELL -lc Exec`
-	Dir     string   // working directory; "" = inherit
-	Env     []string // extra KEY=VALUE entries
-	Restart string   // never | on-failure | always (automatic restarts)
+	Title string   // label; default derived from the command
+	Shell string   // interactive shell; default $SHELL, then /bin/sh
+	Run   string   // run: command in an interactive shell, then a prompt (DP-4)
+	Exec  string   // exec: the pane process is `$SHELL -lc Exec`
+	Dir   string   // working directory; "" = inherit
+	Env   []string // extra KEY=VALUE entries
+
+	// As written in the config (unexpanded: "logs", "~/work", "$HOME/x"),
+	// so --save/--package reproduce the author's intent, not this machine.
+	RawDir  string
+	RawEnv  []string
+	Restart string // never | on-failure | always (automatic restarts)
 }
 
 func (s Spec) shell() string {
