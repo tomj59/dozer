@@ -104,6 +104,19 @@ bin/dozer -c examples/dev.yaml
 bin/dozer --check examples/tree.yaml    # validate + show what would launch, without launching
 ```
 
+### Saving and sharing a setup
+
+- `--save my.yaml` writes what you launched as an editable YAML file: your work-in-progress copy.
+- `--package my-tool` writes **`my-tool.sh`**, a runnable script with the config inside. Copy it to another folder or send it to someone who has dozer, and `./my-tool.sh` recreates the workspace. There's no separate YAML to keep in sync.
+
+```sh
+bin/dozer -c examples/dev.yaml --package dev-ws     # → ./dev-ws.sh
+./dev-ws.sh                                         # launch (extra flags pass through)
+./dev-ws.sh --show-config                           # see the config inside
+```
+
+A package needs `dozer` on your PATH. While testing from the repo, run `DOZER_BIN=$PWD/bin/dozer ./dev-ws.sh`, or copy `bin/dozer` into a folder on your PATH.
+
 To reuse a config as a **profile**, copy it to `~/.config/dozer/NAME.yaml` and run `dozer NAME`. A `.dozer.yaml` in the current folder, or `~/.config/dozer/config.yaml`, is loaded automatically by a bare `dozer`.
 
 ## 4. When a pane's process ends

@@ -76,13 +76,26 @@ func Defaults() *Config {
 	return &Config{Layout: root, Panes: make([]pane.Spec, root.Panes()), Prefix: 0x01, MinPane: layout.Min{W: 20, H: 5}, StatusBar: "bottom"}
 }
 
-// Load reads and resolves a YAML config file.
-func Load(path string) (*Config, error) {
+// Load reads and resolves a YAML config file, or the config embedded in a
+// packaged dozer script (see Package). Relative cwd paths resolve against
+// the file's folder.
+func Load(path string) (*Config, error) { return LoadFrom(path, "") }
+
+// LoadFrom is Load with an explicit base folder for relative cwd paths
+// ("" = the file's folder). Packaged scripts pass their own folder, since
+// they hand dozer the config on a file descriptor (/dev/fd/3).
+func LoadFrom(path, base string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	c, err := Parse(data, filepath.Dir(path))
+	if y, ok := Unpack(data); ok {
+		data = y
+	}
+	if base == "" {
+		base = filepath.Dir(path)
+	}
+	c, err := Parse(data, base)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}

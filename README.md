@@ -2,7 +2,7 @@
 
 A TUI multi-shell for Linux and macOS: one terminal window holding several live shells in a row/column layout, each set up at launch by flags, piped commands or a YAML file.
 
-> **Status: M2.** Multiple panes in rows/columns, focus, zoom, runtime resize, dead-pane handling, YAML configs and `--save`. See [`docs/SPEC.md`](docs/SPEC.md) for the design and roadmap.
+> **Status: M2.** Multiple panes in rows/columns, focus, zoom, runtime resize, dead-pane handling, YAML configs, `--save` and `--package`. See [`docs/SPEC.md`](docs/SPEC.md) for the design and roadmap.
 
 **New here? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md).**
 
@@ -25,6 +25,7 @@ bin/dozer -p htop -p 'git log'     # run commands in panes 1, 2 … then leave a
 bin/dozer -x 'tail -f log'         # the pane IS the command
 bin/dozer -c examples/dev.yaml     # a YAML config; see examples/
 bin/dozer --check examples/tree.yaml
+bin/dozer -c examples/dev.yaml --package dev-ws   # → dev-ws.sh, a shareable runnable script
 ```
 
 Prefix key: **Ctrl-a**, then: arrows/hjkl/1-9/o to focus, `z` zoom, `H J K L` resize, `=` reset sizes, `t` rename, `s` status bar, `x` kill, `r`/`R` restart, `Ctrl-l` redraw, `q` quit, `Esc` cancel.

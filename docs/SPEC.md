@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.9 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.10 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -24,6 +24,7 @@ A bare `dozer` launches the default 3-pane layout with an interactive `$SHELL` i
 | `--save` | **Saves configuration only**: layout, sizes, titles, flags, display prefs, and each pane's launch command. It never saves process state, history or remote session state. **Stubbed in v1.** | Only a handful of settings can change after launch (§4.8), so there's little runtime change to save. Revisit once real use shows the runtime settings are worth capturing. |
 | Pane lifecycle | **The layout is permanent; dead panes stay put, are flagged loudly, and the user restores them** (§4.10) | dozer's job is to keep a multi-shell skeleton. An exit, crash or dropped ssh session must never collapse or rearrange the layout. Restoring is the user's call (`C-a r`); dozer's job is to make a dead pane impossible to miss. Automatic restart is opt-in per pane (`restart:`). |
 | Quitting | **dozer quits only when you tell it to** (`C-a q`), never because panes exited, even the last one | One rule for every layout. A stray `exit` or a crash can't throw away your arrangement. A single-pane dozer is an outlier use, so it follows the same rule rather than getting an exception. `quit_when_all_exited: true` (config, and a flag) opts into the old behavior. |
+| Config forms | **YAML is the working copy; a package is the release** (§4.12) | `--save` and YAML files are the editable, work-in-progress form you iterate on. `--package NAME` freezes a config into one runnable `NAME.sh` that embeds it. You can copy it between folders or share it, and there's no separate YAML to drift out of sync. |
 | Small terminals | **Provisional: panes keep a minimum size and the canvas scrolls** | Tune during functional review. See DP-1 in §10. |
 | Name | **dozer** | Win-*dows* meets construction equipment. The binary, module and config paths all use it. |
 | Pane borders | **Thin, shared one-line dividers** (tmux-style) | Maximizes pane space. Pane titles sit inline in the divider above each pane, and the focused pane's divider is highlighted. |
@@ -239,6 +240,37 @@ Built-in pane styles would be named after familiar looks (`homebrew`, `classic`,
 
 Scheduled after M5; see the roadmap. Nothing is exposed in the config yet.
 
+### 4.12 Packaged workspaces (`--package`)
+
+`dozer <flags or -c file> --package my-tool` writes **`my-tool.sh`**: a POSIX `sh` script with the resolved config embedded in it. It is the frozen, shareable form of a workspace.
+
+| Command | Does |
+|---|---|
+| `./my-tool.sh` | Launches dozer with the embedded config |
+| `./my-tool.sh --prefix C-b` | Passes extra flags through to dozer |
+| `./my-tool.sh --show-config` | Prints the embedded YAML |
+| `dozer --check my-tool.sh`, `dozer -c my-tool.sh` | dozer reads a package directly, the same as a YAML file |
+
+To change a package, unpack it, edit, and repackage: `./my-tool.sh --show-config > my-tool.yaml`, edit that file, then `dozer -c my-tool.yaml --package my-tool.sh`.
+
+**How it's built:**
+
+- The YAML sits in a quoted heredoc inside a shell function, so it's never shell-expanded.
+- The script `exec`s `dozer --base <script folder> -c /dev/fd/3 "$@"`, with the YAML fed on file descriptor 3. The keyboard stays on stdin.
+- It needs only POSIX `sh` and `/dev/fd`, which both Linux and macOS have.
+- The script's name, minus `.sh`, becomes the workspace `name` shown in the status bar.
+
+**Portability:**
+
+- cwd paths inside the package's folder are written relative to the script (`./logs`), and they resolve against wherever the script is run from.
+- Paths under `$HOME` are written as `~/…`, so they resolve for whoever runs it.
+- Anything else stays absolute.
+- `env` values are stored as resolved at packaging time.
+
+**Safety:** `--package` overwrites only files that are already dozer packages; it refuses to overwrite any other script.
+
+**Dependency:** the script needs a `dozer` binary on `PATH`, or at `$DOZER_BIN`. If neither is there, it prints where to get dozer and exits 127. See DP-6 for making packages fully standalone.
+
 ## 5. Configuration (YAML)
 
 Locations: `-c <file>`, otherwise `./.dozer.yaml`, otherwise `~/.config/dozer/config.yaml` (XDG). CLI flags override the file.
@@ -373,6 +405,7 @@ These are designed in from the start, even where v1 uses only one implementation
 | **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
 | **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
+| **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
 | **Deferred** | `C-a S` runtime save of sizes, titles and status bar. Revisit after functional review. |
 | **M6 Ship** | goreleaser, Homebrew tap, `dozer --help`/man page, example configs. |
 | **Functional review** | Try the small-terminal behavior (DP-1) and multi-input ergonomics with real use, then adjust. |
@@ -472,6 +505,19 @@ dozer is the color authority. The compositor maps each cell's *semantic* color (
 3. **Keep pane styling in one place:** the compositor's cell copy (plus OSC replies in the emulator). Never in the pane or PTY layer.
 
 **Alternative rejected:** emitting OSC 10/11/4 to the host terminal on focus change. The host can hold only one palette at a time, so unfocused panes would render in the wrong style.
+
+### DP-6 · Should packages carry dozer itself?
+
+**Status:** open. v1 packages need dozer on `PATH` (§4.12). That keeps scripts tiny (under 2 KB), readable, and diffable in git.
+
+If sharing with people who don't have dozer turns out to matter, there are two roads:
+
+| Option | Pros | Cons |
+|---|---|---|
+| **(a) Embed binaries** (`--package --standalone`): base64 dozer builds for darwin/linux × arm64/amd64 inside the script, extracted to `~/.cache/dozer/<version>/` on first run | Truly self-contained; works offline | About 12 MB per script (4 × 3 MB); opaque; every package pins a dozer version |
+| **(b) Bootstrap**: the script downloads the matching dozer release from GitHub on first run | Small script; version-pinned | Needs network and published releases (M6); a download-and-run step some users won't accept |
+
+A version pin is also worth considering: the script records the dozer version that made it and warns on a mismatch. **Escalate** when M6 packaging (releases, Homebrew) is designed, because (b) depends on it.
 
 ## 11. Risks
 

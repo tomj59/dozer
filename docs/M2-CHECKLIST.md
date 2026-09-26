@@ -23,6 +23,11 @@ cd ~/claude/Projects/tui-multi-shell/dozer && make && make test && bin/dozer
 | K2 | `Ctrl-a x`, then `y` | The pane dies (`✖ SIGHUP`), the layout is unchanged; `Ctrl-a r` brings it back | |
 | V1 | `bin/dozer -l 2,1 --heights 70,30 -p top --save -` | Prints a YAML config; `--save my.yaml` writes one, and `bin/dozer -c my.yaml` launches the same thing | |
 | V2 | `bin/dozer --save - -c examples/tree.yaml` | Tree form, with the original pane names | |
+| P1 | `bin/dozer -c examples/dev.yaml --package /tmp/dev-ws` | Writes `/tmp/dev-ws.sh`, which is executable | |
+| P2 | `cd /tmp && DOZER_BIN=~/claude/Projects/tui-multi-shell/dozer/bin/dozer ./dev-ws.sh` | The dev workspace launches; the status bar says `dev-ws` | |
+| P3 | `./dev-ws.sh --show-config` | Prints the YAML | |
+| P4 | `./dev-ws.sh` without dozer on PATH (no DOZER_BIN) | A clear "needs dozer" message, exit 127 | |
+| P5 | A config with `cwd: sub` packaged into a folder, then the script copied elsewhere | The pane starts in `sub/` next to the *copied* script | |
 | C1 | `status_bar: top` in a config | The bar at the top; panes below it | |
 
 Report: results, plus your feel for the resize step sizes (2 columns / 1 row per press) and the repeat window (0.7 s).

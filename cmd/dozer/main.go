@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -59,6 +60,7 @@ Examples:
   dozer dev                      load ~/.config/dozer/dev.yaml
   printf 'top\nping 1.1.1.1\n' | dozer   piped: one pane command per line
   dozer -l 2,1 -p htop --save my.yaml   turn a command line into a config file
+  dozer -c my.yaml --package my-tool.sh  a runnable, shareable script with the config inside
 
 Flags:
 `
@@ -74,6 +76,8 @@ func main() {
 		quitAll   = flag.Bool("quit-when-all-exited", false, "quit once every pane has exited (default: stay, showing dead panes)")
 		check     = flag.Bool("check", false, "validate and print the resolved configuration, then exit")
 		save      = flag.String("save", "", "write the resolved configuration as YAML to `file` (- = stdout), then exit")
+		pkg       = flag.String("package", "", "write a self-contained, runnable `script` (NAME.sh) with the configuration inside, then exit")
+		base      = flag.String("base", "", "folder that relative cwd paths resolve against (default: the config file's folder; set by packaged scripts)")
 		emuName   = flag.String("emu", "charm", fmt.Sprintf("terminal emulator back end %v", emu.Names))
 		showVer   = flag.Bool("version", false, "print version and exit")
 	)
@@ -90,7 +94,7 @@ func main() {
 		return
 	}
 
-	cfg, err := build(*cfgFile, flag.Args(), *layoutArg, *heights, widths, *prefix, *quitAll, specs)
+	cfg, err := build(*cfgFile, *base, flag.Args(), *layoutArg, *heights, widths, *prefix, *quitAll, specs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dozer:", err)
 		os.Exit(2)
@@ -100,6 +104,13 @@ func main() {
 		if *save == "" {
 			return
 		}
+	}
+	if *pkg != "" {
+		if err := writePackage(cfg, *pkg); err != nil {
+			fmt.Fprintln(os.Stderr, "dozer: --package:", err)
+			os.Exit(1)
+		}
+		return
 	}
 	if *save != "" {
 		hdr := fmt.Sprintf("Saved by dozer %s --save on %s.\nConfiguration only: layout, sizes, display settings and each pane's launch command.", version, time.Now().Format("2006-01-02 15:04"))
@@ -147,7 +158,7 @@ func main() {
 }
 
 // build resolves the launch config: file/profile, then flag overrides.
-func build(cfgFile string, args []string, layoutArg, heights string, widths []string,
+func build(cfgFile, base string, args []string, layoutArg, heights string, widths []string,
 	prefix string, quitAll bool, specs []pane.Spec) (*config.Config, error) {
 	if cfgFile != "" && len(args) > 0 {
 		return nil, fmt.Errorf("give either -c FILE or a profile name, not both")
@@ -172,7 +183,7 @@ func build(cfgFile string, args []string, layoutArg, heights string, widths []st
 	}
 	cfg := config.Defaults()
 	if path != "" {
-		c, err := config.Load(path)
+		c, err := config.LoadFrom(path, base)
 		if err != nil {
 			return nil, err
 		}
@@ -259,4 +270,38 @@ func readCommands(r io.Reader) ([]pane.Spec, error) {
 		out = append(out, pane.Spec{Run: line})
 	}
 	return out, sc.Err()
+}
+
+// writePackage writes cfg as a packaged script (docs/SPEC.md §4.12).
+func writePackage(cfg *config.Config, path string) error {
+	if !strings.HasSuffix(path, ".sh") {
+		path += ".sh"
+	}
+	name, err := config.PackageName(path)
+	if err != nil {
+		return err
+	}
+	// Only overwrite our own packages, never an unrelated script.
+	if old, err := os.ReadFile(path); err == nil {
+		if _, ok := config.Unpack(old); !ok {
+			return fmt.Errorf("%s exists and is not a dozer package; not overwriting", path)
+		}
+	}
+	dir := filepath.Dir(path)
+	out, err := cfg.Package(name, dir, version, time.Now().Format("2006-01-02"))
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, out, 0o755); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "dozer: packaged %s (run it with: %s)\n", path, runHint(path))
+	return nil
+}
+
+func runHint(path string) string {
+	if filepath.IsAbs(path) || strings.Contains(path, "/") {
+		return path
+	}
+	return "./" + path
 }

@@ -21,7 +21,19 @@ import (
 // Shorthand-shaped layouts are written as "2,1" plus heights/widths; any
 // other tree is written in tree form, keeping the config's pane names
 // (or p1, p2, … for trees built another way).
-func (c *Config) YAML(header string) ([]byte, error) {
+func (c *Config) YAML(header string) ([]byte, error) { return c.yaml(header, nil) }
+
+// yaml renders the config; portable (if non-nil) rewrites each cwd for
+// sharing (see Package).
+func (c *Config) yaml(header string, portable func(string) string) ([]byte, error) {
+	if portable != nil {
+		cp := *c
+		cp.Panes = append([]pane.Spec(nil), c.Panes...)
+		for i := range cp.Panes {
+			cp.Panes[i].Dir = portable(cp.Panes[i].Dir)
+		}
+		c = &cp
+	}
 	doc := &yaml.Node{Kind: yaml.MappingNode}
 	add := func(key string, v *yaml.Node) {
 		doc.Content = append(doc.Content, str(key), v)
