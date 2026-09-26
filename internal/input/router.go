@@ -1,0 +1,105 @@
+// Package input splits raw host keyboard bytes into pass-through data for
+// the focused pane and dozer commands.
+//
+// dozer does not decode and re-encode keys. Bytes pass through untouched,
+// and only the prefix key is intercepted. That keeps Alt/Meta, modified
+// arrows and other exotic sequences exact. (The host terminal is put into
+// the focused program's key modes, so the bytes already arrive encoded
+// correctly for it.)
+package input
+
+// Kind is the kind of an Action.
+type Kind int
+
+const (
+	// Forward means send Data to the focused pane.
+	Forward Kind = iota
+	// Command means run the dozer command bound to Key.
+	Command
+)
+
+// Action is one routed piece of input.
+type Action struct {
+	Kind Kind
+	Data []byte // Forward
+	Key  byte   // Command: the byte pressed after the prefix
+}
+
+var (
+	pasteStart = []byte("\x1b[200~")
+	pasteEnd   = []byte("\x1b[201~")
+)
+
+// Router is a small state machine: normal → prefix-pending → normal.
+// Bracketed-paste content is never scanned for the prefix, so pasted text
+// containing the prefix byte (for example ^A) passes through intact.
+type Router struct {
+	Prefix byte // default 0x01 (Ctrl-a)
+
+	pending bool // prefix seen, waiting for the command key
+	inPaste bool
+	match   int // bytes of pasteStart/pasteEnd matched so far
+}
+
+// NewRouter returns a router for the given prefix byte.
+func NewRouter(prefix byte) *Router { return &Router{Prefix: prefix} }
+
+// Pending reports whether the prefix was pressed and a command key is awaited.
+func (r *Router) Pending() bool { return r.pending }
+
+// Feed routes a chunk of raw input.
+func (r *Router) Feed(b []byte) []Action {
+	var out []Action
+	start := 0 // start of the current forward run
+	flush := func(end int) {
+		if end > start {
+			out = append(out, Action{Kind: Forward, Data: append([]byte(nil), b[start:end]...)})
+		}
+	}
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		r.trackPaste(c)
+		if r.inPaste {
+			continue
+		}
+		if r.pending {
+			r.pending = false
+			if c == r.Prefix { // prefix twice: send one literal prefix
+				start = i
+				continue
+			}
+			out = append(out, Action{Kind: Command, Key: c})
+			start = i + 1
+			continue
+		}
+		if c == r.Prefix {
+			flush(i)
+			r.pending = true
+			start = i + 1
+		}
+	}
+	if !r.pending {
+		flush(len(b))
+	}
+	return out
+}
+
+// trackPaste follows ESC[200~ … ESC[201~ across chunk boundaries.
+func (r *Router) trackPaste(c byte) {
+	want := pasteStart
+	if r.inPaste {
+		want = pasteEnd
+	}
+	if c == want[r.match] {
+		r.match++
+		if r.match == len(want) {
+			r.inPaste = !r.inPaste
+			r.match = 0
+		}
+		return
+	}
+	r.match = 0
+	if c == want[0] {
+		r.match = 1
+	}
+}
