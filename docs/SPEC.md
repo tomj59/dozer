@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.13 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.14 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -410,7 +410,7 @@ These are designed in from the start, even where v1 uses only one implementation
 | **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
 | **M2 Control** (Linux ✅, Mac pending) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
-| **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, mouse focus/resize/scroll and passthrough. |
+| **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, **resize reflow (DP-7)**, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
 | **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
 | **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
@@ -527,6 +527,23 @@ If sharing with people who don't have dozer turns out to matter, there are two r
 | **(b) Bootstrap**: the script downloads the matching dozer release from GitHub on first run | Small script; version-pinned | Needs network and published releases (M6); a download-and-run step some users won't accept |
 
 A version pin is also worth considering: the script records the dozer version that made it and warns on a mismatch. **Escalate** when M6 packaging (releases, Homebrew) is designed, because (b) depends on it.
+
+### DP-7 · Resize reflow (found in E01)
+
+**Status:** decided; build it with scrollback in M4.
+
+**Symptom:** after shrinking the window, output that was cut off at the new width doesn't come back when the window grows again. It isn't a limit of the host terminal. Terminal.app, iTerm2, kitty and tmux all rewrap text on resize. The cause is in dozer: the emulator truncates each line to the new width and throws the cut-off cells away, and it doesn't record which lines were soft-wrapped, so it can't rejoin them. Full-screen programs (vim, top) aren't affected because they redraw themselves on resize. The loss hits shell output and the guide panes.
+
+**Decision:** store *logical* lines, not just a screen grid.
+
+- Each row records whether it ended in a soft wrap (autowrap at the right margin) or a real newline.
+- On resize, the main screen plus scrollback is rewrapped at the new width. That's the same text model scrollback needs anyway (search, copy mode, and copying a wrapped line as one line).
+- The alternate screen isn't reflowed; the program there redraws itself.
+- The cursor position is carried through the reflow.
+
+This is a change inside the emulator (`third_party/vt`: wrap flag on lines, and reflow in `Screen.Resize` plus `Scrollback`), with no change to the adapter interface. Doing it together with M4 avoids building the scrollback storage twice.
+
+**Alternative rejected:** keeping each line's cut-off tail and pasting it back on grow. It's cheap, but it goes wrong as soon as the program writes to those rows at the narrower width, and it doesn't rewrap anything.
 
 ## 11. Risks
 
