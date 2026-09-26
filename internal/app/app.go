@@ -123,14 +123,8 @@ func Run(o Options) (code int, err error) {
 		status.title = snap.Title
 		status.draw(scr, bh-1, bw)
 		term.Mirror(snap.Modes)
-		if snap.CursorVisible && !status.pending {
-			_ = scr.SetCursorPosition(area.Min.X+snap.CursorX, area.Min.Y+snap.CursorY)
-			_ = scr.ShowCursor()
-		} else {
-			_ = scr.HideCursor()
-		}
-		_ = scr.Render()
-		_ = scr.Flush()
+		_ = term.Present(area.Min.X+snap.CursorX, area.Min.Y+snap.CursorY,
+			snap.CursorVisible && !status.pending)
 	}
 
 	var last time.Time
@@ -141,12 +135,11 @@ func Run(o Options) (code int, err error) {
 		case <-p.Done():
 			return p.ExitCode(), nil
 		case <-redraw:
-			w, h := term.Size()
-			_ = term.Scr.Resize(w, h) // Resize erases, forcing a full repaint
+			term.Redraw()
 			mark()
 		case <-winch:
 			w, h := term.Size()
-			_ = term.Scr.Resize(w, h)
+			term.Resize(w, h)
 			p.Resize(w, paneRows(h))
 			mark()
 		case <-dirty:

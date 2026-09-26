@@ -29,6 +29,23 @@ send j j Down x
 send Escape ':q!' Enter
 check "back from alt screen" "red wide"
 
+# Cursor must track line editing with no lag (regression: the host cursor
+# trailed the pane cursor by one frame).
+cursor_is() { # name, expected column
+  local got; got=$(tmux display -p -t "$S" '#{cursor_x}')
+  if [ "$got" = "$2" ]; then echo "ok   $1"; else echo "FAIL $1: cursor_x=$got want $2"; fail=1; fi
+}
+send C-u 'echo abcdef'
+end=$(tmux display -p -t "$S" '#{cursor_x}')
+send Left
+cursor_is "cursor follows 1st Left" $((end - 1))
+send Left
+cursor_is "cursor follows 2nd Left" $((end - 2))
+send BSpace X
+check "edit lands at cursor" "echo abcXef"
+cursor_is "cursor after edit" $((end - 2))
+send C-u
+
 send C-a
 check "prefix pending shown" "PREFIX"
 send C-a

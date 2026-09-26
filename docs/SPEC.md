@@ -367,6 +367,7 @@ Small patches (about 50 lines; three for speed, one for a data race, recorded in
 - Throughput is still about 2× behind vt10x. The remaining cost is per scroll: blank-filling the new line, trimming the scrolled-off line, and marking lines as changed. A deeper fix (lazily created blank lines, a compact scrollback) can come later if real use needs it.
 - Scrollback memory: every cell is about 112 bytes, so scrollback is sized by content, not pane width. Still, 10,000 lines of wide colored output per pane can reach tens of MB. Revisit with the M4 scrollback work.
 - ultraviolet and x/vt are pre-1.0 (pseudo-versions), so API churn is possible. The adapter layer contains it.
+- **Found in Mac testing (fixed):** the host cursor lagged one keystroke behind the shell's, which made line editing drift and scramble. The cause is in `uv.TerminalScreen.Flush`: it queues the cursor move *after* writing out the frame, so each move went out one frame late. dozer now drives `uv.TerminalRenderer` directly (`internal/host`), and `scripts/smoke.sh` checks the cursor after each edit. Report upstream.
 
 ### DP-3 · Core/UI boundary (M1)
 
