@@ -36,4 +36,5 @@ panes:
 #   exec:    "tail -F app.log" the pane IS this command; it ends when the command ends
 #   cwd, env, shell            per-pane overrides
 #   restart: never | on-failure | always   (exec panes only; auto-restart with back-off)
+#   max_restarts: 5 | N | unlimited         (give up after N restarts in a row; default 5)
 # A bare string is shorthand for run:, e.g.  - "git log --oneline -20"

@@ -216,8 +216,14 @@ func (a *App) drawBanner(cv uv.Screen, c layout.Rect, s pane.Snapshot) {
 	if s.State != pane.Exited {
 		msg = " ✖" + msg
 	}
-	if s.RestartPending {
-		msg = " ↻ restarting automatically… "
+	switch {
+	case s.RestartPending && s.MaxRestarts >= 0:
+		msg = fmt.Sprintf(" ↻ restarting automatically (%d/%d)… ", s.Restarts, s.MaxRestarts)
+	case s.RestartPending:
+		msg = fmt.Sprintf(" ↻ restarting automatically (#%d)… ", s.Restarts)
+	case s.GaveUp:
+		msg = fmt.Sprintf(" ✖ %s · gave up after %d automatic restarts · C-%c r to try again ",
+			strings.TrimPrefix(stateText(s), "✖ "), s.Restarts, 'a'+a.cfg.Prefix-1)
 	}
 	y := c.Y + c.H - 1
 	for x := c.X; x < c.X+c.W; x++ {

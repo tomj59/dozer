@@ -22,6 +22,13 @@ import (
 	"github.com/tomj59/dozer/internal/emu"
 )
 
+// Automatic-restart limits. A run that stays up for HealthyRun resets the
+// count, so a service that crashes once a day never runs out of restarts.
+const (
+	DefaultMaxRestarts = 5
+	HealthyRun         = time.Minute
+)
+
 // Restart policies for automatic restarts.
 const (
 	RestartNever     = "never"
@@ -43,6 +50,9 @@ type Spec struct {
 	RawDir  string
 	RawEnv  []string
 	Restart string // never | on-failure | always (automatic restarts)
+	// MaxRestarts caps consecutive automatic restarts before dozer gives up
+	// and leaves the pane dead: 0 = DefaultMaxRestarts, -1 = unlimited.
+	MaxRestarts int
 }
 
 func (s Spec) shell() string {
@@ -156,6 +166,8 @@ type Pane struct {
 	signal    string // e.g. "SIGKILL" if killed by a signal
 	exitedAt  time.Time
 	restarts  int         // consecutive automatic restarts (for back-off)
+	startedAt time.Time   // when the current process started
+	gaveUp    bool        // hit MaxRestarts; waits for a manual restart
 	noRestart bool        // killed on purpose: skip automatic restart once
 	timer     *time.Timer // pending automatic restart
 }
@@ -198,7 +210,8 @@ func (p *Pane) startLocked() error {
 	}
 	p.gen++
 	p.em, p.ptmx, p.cmd = em, ptmx, cmd
-	p.state, p.code, p.signal = Running, 0, ""
+	p.state, p.code, p.signal, p.gaveUp = Running, 0, "", false
+	p.startedAt = time.Now()
 	gen := p.gen
 	go func() { _, _ = io.Copy(ptmx, em.Replies()) }() // DA/DSR replies to the child
 	go p.readLoop(gen, ptmx, em, cmd)
@@ -276,7 +289,14 @@ func (p *Pane) exitedLocked(werr error) {
 	if p.noRestart {
 		pol, p.noRestart = RestartNever, false
 	}
+	if time.Since(p.startedAt) >= HealthyRun {
+		p.restarts = 0 // it ran fine for a while: start counting afresh
+	}
 	if pol == RestartAlways || (pol == RestartOnFailure && p.state != Exited) {
+		if limit := p.maxRestarts(); limit >= 0 && p.restarts >= limit {
+			p.gaveUp = true // stop hammering; the user decides (C-a r)
+			return
+		}
 		delay := time.Second << min(p.restarts, 5)
 		delay = min(delay, 30*time.Second)
 		p.restarts++
@@ -290,6 +310,16 @@ func (p *Pane) exitedLocked(werr error) {
 			p.dirty()
 		})
 	}
+}
+
+func (p *Pane) maxRestarts() int {
+	switch {
+	case p.Spec.MaxRestarts < 0:
+		return -1
+	case p.Spec.MaxRestarts == 0:
+		return DefaultMaxRestarts
+	}
+	return p.Spec.MaxRestarts
 }
 
 // Restart relaunches the pane's launch command in the same slot. It works
@@ -382,13 +412,17 @@ type Snapshot struct {
 	Signal           string
 	ExitedAt         time.Time
 	RestartPending   bool
+	Restarts         int // automatic restarts so far (in the current streak)
+	MaxRestarts      int // the limit (-1 = unlimited)
+	GaveUp           bool
 }
 
 // Draw paints the pane's screen into area and returns its state.
 func (p *Pane) Draw(dst uv.Screen, area uv.Rectangle) Snapshot {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	s := Snapshot{State: p.state, Code: p.code, Signal: p.signal, ExitedAt: p.exitedAt, RestartPending: p.timer != nil}
+	s := Snapshot{State: p.state, Code: p.code, Signal: p.signal, ExitedAt: p.exitedAt, RestartPending: p.timer != nil,
+		Restarts: p.restarts, MaxRestarts: p.maxRestarts(), GaveUp: p.gaveUp}
 	if p.em == nil {
 		return s
 	}

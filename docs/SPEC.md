@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.12 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.13 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -212,6 +212,8 @@ When a pane dies:
 - The restarted pane starts on a fresh screen; the dead output is discarded (scrollback, M4, may keep it later).
 
 **Automatic restart** (`restart: on-failure|always`) stays opt-in per pane, for panes like `tail -F` or a dashboard. Automatic restarts use a back-off (1 s, 2 s, 4 s … capped at 30 s), so a crash-looping command can't spin.
+
+**Retry limit** (from Mac testing, D03): automatic restarts are capped at **5 in a row** by default (`max_restarts: N`, or `max_restarts: unlimited`). At the limit, dozer stops and leaves the pane dead with `✖ exit 1 · gave up after 5 automatic restarts · C-a r to try again`, so a command that's expensive to start but keeps failing isn't hammered forever. A run that stays up for at least a minute resets the count, so a long-running service that crashes occasionally never runs out of restarts. A manual `C-a r` also starts a fresh streak. While a restart is pending, the banner shows the count, for example `↻ restarting automatically (3/5)…`.
 
 **Quitting:** dozer never exits because panes died, even when all of them are dead. It shows every dead pane and waits for `C-a r`/`C-a R`/`C-a q`. `C-a q` asks for confirmation (§4.4) when any pane is still running. Restoring the whole arrangement after quitting dozer means relaunching with the same flags or profile. That's exactly what a profile or `--save` (§4.9) is for.
 

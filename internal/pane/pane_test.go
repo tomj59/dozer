@@ -23,7 +23,7 @@ func start(t *testing.T, spec Spec, cols, rows int) *Pane {
 
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(8 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
@@ -156,5 +156,26 @@ func TestChildEnv(t *testing.T) {
 		if strings.Contains(got, bad) {
 			t.Errorf("%s leaked into %s", bad, got)
 		}
+	}
+}
+
+func TestRestartLimit(t *testing.T) {
+	p := start(t, Spec{Exec: `exit 1`, Restart: RestartOnFailure, MaxRestarts: 2}, 20, 3)
+	// First run + 2 automatic restarts (1s, 2s back-off), then give up.
+	waitFor(t, "give up", func() bool {
+		_, s := draw(p, 20, 3)
+		return s.GaveUp
+	})
+	_, s := draw(p, 20, 3)
+	if s.Restarts != 2 || s.RestartPending {
+		t.Errorf("restarts=%d pending=%v, want 2 and no pending restart", s.Restarts, s.RestartPending)
+	}
+	// A manual restart resets the streak.
+	if err := p.Restart(); err != nil {
+		t.Fatal(err)
+	}
+	_, s = draw(p, 20, 3)
+	if s.GaveUp || p.restartsSoFar() != 0 {
+		t.Errorf("after manual restart: gaveUp=%v restarts=%d", s.GaveUp, p.restartsSoFar())
 	}
 }

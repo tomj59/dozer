@@ -26,7 +26,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 |---|---|---|---|
 | D01 | [Dead-pane states and chrome](D01-dead-states.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | D02 | [Restoring dead panes (r / R)](D02-restore.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
-| D03 | [Automatic restart with back-off](D03-auto-restart.sh) | M1 | |
+| D03 | [Automatic restart: back-off and the retry limit](D03-auto-restart.sh) | M2 | PASS (back-off) · Terminal.app · 2026-09-26; retest for the new limit |
 | D04 | [Kill a pane (x)](D04-kill.sh) | M2 | |
 | D05 | [quit_when_all_exited: true](D05-quit-when-all-exited.sh) | M1 | |
 | D06 | [Quit confirmation](D06-quit-confirm.sh) | M1 | |

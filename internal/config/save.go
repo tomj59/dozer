@@ -235,6 +235,12 @@ func paneNode(p, shared pane.Spec) *yaml.Node {
 	}
 	if p.Restart != "" && p.Restart != pane.RestartNever {
 		kv("restart", p.Restart)
+		switch {
+		case p.MaxRestarts < 0:
+			kv("max_restarts", "unlimited")
+		case p.MaxRestarts > 0:
+			kv("max_restarts", strconv.Itoa(p.MaxRestarts))
+		}
 	}
 	if p.Shell != shared.Shell {
 		kv("shell", p.Shell)

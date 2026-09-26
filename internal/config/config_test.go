@@ -162,3 +162,30 @@ func TestManualCases(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxRestarts(t *testing.T) {
+	c, err := Parse([]byte("panes: [{exec: x, restart: always, max_restarts: 3}, {exec: y, restart: on-failure, max_restarts: unlimited}, {exec: z, restart: always}]"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Panes[0].MaxRestarts != 3 || c.Panes[1].MaxRestarts != -1 || c.Panes[2].MaxRestarts != 0 {
+		t.Errorf("max restarts = %d %d %d", c.Panes[0].MaxRestarts, c.Panes[1].MaxRestarts, c.Panes[2].MaxRestarts)
+	}
+	if d := c.Describe(); !strings.Contains(d, "max 3") || !strings.Contains(d, "max unlimited") || !strings.Contains(d, "max 5") {
+		t.Errorf("describe:\n%s", d)
+	}
+	out, _ := c.YAML("")
+	c2, err := Parse(out, "")
+	if err != nil || c2.Describe() != c.Describe() {
+		t.Errorf("round trip: %v\n%s", err, out)
+	}
+	for in, want := range map[string]string{
+		"panes: [{exec: x, max_restarts: 3}]":                     "needs restart:",
+		"panes: [{exec: x, restart: always, max_restarts: 0}]":    "must be a number",
+		"panes: [{exec: x, restart: always, max_restarts: lots}]": "must be a number",
+	} {
+		if _, err := Parse([]byte(in), ""); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Parse(%q) = %v, want %q", in, err, want)
+		}
+	}
+}

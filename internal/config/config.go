@@ -68,6 +68,7 @@ type paneFile struct {
 	Env      map[string]string `yaml:"env"`
 	Shell    string            `yaml:"shell"`
 	Restart  string            `yaml:"restart"`
+	MaxRest  string            `yaml:"max_restarts"` // a number, or "unlimited"
 	Readonly yaml.Node         `yaml:"readonly"`
 	Group    yaml.Node         `yaml:"group"`
 	Min      yaml.Node         `yaml:"min"`
@@ -253,6 +254,21 @@ func decodePane(n *yaml.Node, base pane.Spec, baseDir string) (pane.Spec, []stri
 	if pf.Restart != "" && pf.Restart != pane.RestartNever && pf.Exec == "" {
 		return pane.Spec{}, nil, fmt.Errorf("line %d: restart: only applies to exec: panes (a run: pane keeps its shell)", n.Line)
 	}
+	maxRestarts := 0
+	switch pf.MaxRest {
+	case "":
+	case "unlimited":
+		maxRestarts = -1
+	default:
+		v, err := strconv.Atoi(pf.MaxRest)
+		if err != nil || v < 1 {
+			return pane.Spec{}, nil, fmt.Errorf("line %d: max_restarts must be a number ≥ 1 or \"unlimited\"", n.Line)
+		}
+		maxRestarts = v
+	}
+	if pf.MaxRest != "" && (pf.Restart == "" || pf.Restart == pane.RestartNever) {
+		return pane.Spec{}, nil, fmt.Errorf("line %d: max_restarts needs restart: on-failure or always", n.Line)
+	}
 	var warn []string
 	for key, v := range map[string]*yaml.Node{"readonly": &pf.Readonly, "group": &pf.Group, "min": &pf.Min} {
 		if v.Kind != 0 {
@@ -261,7 +277,7 @@ func decodePane(n *yaml.Node, base pane.Spec, baseDir string) (pane.Spec, []stri
 	}
 	sort.Strings(warn)
 	s := base
-	s.Title, s.Run, s.Exec, s.Restart = pf.Title, pf.Run, pf.Exec, pf.Restart
+	s.Title, s.Run, s.Exec, s.Restart, s.MaxRestarts = pf.Title, pf.Run, pf.Exec, pf.Restart, maxRestarts
 	if pf.Shell != "" {
 		s.Shell = pf.Shell
 	}
@@ -511,7 +527,14 @@ func (c *Config) Describe() string {
 			fmt.Fprintf(&b, "   (cwd %s)", p.Dir)
 		}
 		if p.Restart != "" && p.Restart != pane.RestartNever {
-			fmt.Fprintf(&b, "   (restart %s)", p.Restart)
+			limit := strconv.Itoa(p.MaxRestarts)
+			switch {
+			case p.MaxRestarts == 0:
+				limit = strconv.Itoa(pane.DefaultMaxRestarts)
+			case p.MaxRestarts < 0:
+				limit = "unlimited"
+			}
+			fmt.Fprintf(&b, "   (restart %s, max %s)", p.Restart, limit)
 		}
 		b.WriteByte('\n')
 	}
