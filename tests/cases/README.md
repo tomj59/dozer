@@ -51,7 +51,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 | K02 | [Zoom](K02-zoom.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | K03 | [Runtime resize (H J K L) and reset (=)](K03-resize.sh) | M2 | PASS · Terminal.app · 2026-09-26 |
 | K04 | [Rename (t) and status bar toggle (s)](K04-rename-statusbar.sh) | M2 | PASS · Terminal.app · 2026-09-26 |
-| K05 | [Remapped prefix (C-b)](K05-prefix-ctrl-b.sh) | M1 | |
+| K05 | [Remapped prefix (C-b)](K05-prefix-ctrl-b.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | K06 | [Status bar at the top](K06-statusbar-top.sh) | M2 | |
 
 ## L: Layout
