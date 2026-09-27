@@ -173,6 +173,11 @@ type Pane struct {
 	timer     *time.Timer // pending automatic restart
 
 	scrollback int       // history lines to keep (-1 = emulator default)
+
+	// Input to the program goes through a queue and a writer goroutine, so
+	// a program that stops reading can't block the caller (the UI loop).
+	in     chan []byte
+	inDone chan struct{} // closed when the current process is stopped
 	cm         *CopyMode // scrolled-back view / copy mode; nil when live
 }
 
@@ -214,6 +219,8 @@ func (p *Pane) startLocked() error {
 	}
 	p.gen++
 	p.em, p.ptmx, p.cmd = em, ptmx, cmd
+	p.in, p.inDone = make(chan []byte, 256), make(chan struct{})
+	go writeLoop(ptmx, p.in, p.inDone)
 	p.cm = nil
 	if h, ok := em.(emu.History); ok && p.scrollback >= 0 {
 		h.SetScrollbackSize(p.scrollback)
@@ -231,6 +238,10 @@ func (p *Pane) stopLocked() {
 	if p.cmd != nil && p.cmd.Process != nil && p.state == Running {
 		// pty.Start makes the child a session leader, so pgid == pid.
 		_ = syscall.Kill(-p.cmd.Process.Pid, syscall.SIGHUP)
+	}
+	if p.inDone != nil {
+		close(p.inDone)
+		p.inDone, p.in = nil, nil
 	}
 	if p.ptmx != nil {
 		_ = p.ptmx.Close()
@@ -381,13 +392,50 @@ func (p *Pane) Label() string {
 }
 
 // Input sends bytes to the child as if typed. Dead panes ignore input.
-func (p *Pane) Input(b []byte) {
+func (p *Pane) Input(b []byte) { p.send(b, true) }
+
+// TryInput is Input for generated input (mouse wheel, forwarded mouse
+// events): if the program has stopped reading and its queue is full, the
+// input is dropped instead of waiting.
+func (p *Pane) TryInput(b []byte) { p.send(b, false) }
+
+func (p *Pane) send(b []byte, wait bool) {
+	if len(b) == 0 {
+		return
+	}
 	p.mu.Lock()
-	f := p.ptmx
+	in, done := p.in, p.inDone
 	alive := p.state == Running
 	p.mu.Unlock()
-	if alive && f != nil {
-		_, _ = f.Write(b)
+	if !alive || in == nil {
+		return
+	}
+	b = append([]byte(nil), b...)
+	if wait {
+		select {
+		case in <- b:
+		case <-done:
+		}
+		return
+	}
+	select {
+	case in <- b:
+	case <-done:
+	default: // queue full: drop
+	}
+}
+
+// writeLoop copies queued input to the program's terminal.
+func writeLoop(w io.Writer, in <-chan []byte, done <-chan struct{}) {
+	for {
+		select {
+		case b := <-in:
+			if _, err := w.Write(b); err != nil {
+				return
+			}
+		case <-done:
+			return
+		}
 	}
 }
 

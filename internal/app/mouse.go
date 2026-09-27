@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+
 	"github.com/tomj59/dozer/internal/emu"
 	"github.com/tomj59/dozer/internal/input"
 	"github.com/tomj59/dozer/internal/layout"
@@ -83,6 +85,38 @@ func (a *App) toCanvas(x, y int) (int, int, bool) {
 	return x + a.view.vx, y - y0 + a.view.vy, y >= y0 && y < y0+ah
 }
 
+// repeated is a mouse event and how many times in a row it happened.
+type repeated struct {
+	ev input.MouseEvent
+	n  int
+}
+
+// coalesceWheel merges runs of identical wheel events (same direction and
+// cell) from one read into a single event with a count, so a fast scroll is
+// handled in one step instead of hundreds.
+func coalesceWheel(evs []input.MouseEvent) []repeated {
+	var out []repeated
+	for _, e := range evs {
+		if k := len(out) - 1; k >= 0 && e.Wheel() && out[k].ev == e {
+			out[k].n++
+			continue
+		}
+		out = append(out, repeated{e, 1})
+	}
+	return out
+}
+
+// mouseN handles an event that happened n times in a row (main loop).
+func (a *App) mouseN(e input.MouseEvent, n int) {
+	if e.Wheel() {
+		a.wheelN = n
+		defer func() { a.wheelN = 1 }()
+	} else {
+		n = 1
+	}
+	a.mouse(e)
+}
+
 // mouse handles one host mouse event (main loop).
 func (a *App) mouse(e input.MouseEvent) {
 	cx, cy, onCanvas := a.toCanvas(e.X, e.Y)
@@ -116,7 +150,7 @@ func (a *App) mouse(e input.MouseEvent) {
 		// Hover, or a release with no drag of ours: programs that track
 		// every motion get it.
 		if !h.title && !h.divider && wants(modes, e) {
-			p.Input(e.Encode(h.x, h.y, modes.MouseSGR))
+			p.TryInput(e.Encode(h.x, h.y, modes.MouseSGR))
 		}
 
 	case e.Button == input.MouseLeft && h.divider:
@@ -131,7 +165,7 @@ func (a *App) mouse(e input.MouseEvent) {
 	default: // a press in a pane's content
 		a.setFocus(h.pane)
 		if wants(modes, e) && !e.Shift && !p.InCopy() {
-			p.Input(e.Encode(h.x, h.y, modes.MouseSGR))
+			p.TryInput(e.Encode(h.x, h.y, modes.MouseSGR))
 			*d = drag{kind: dragForward, pane: h.pane}
 			return
 		}
@@ -171,7 +205,7 @@ func (a *App) continueDrag(e input.MouseEvent, cx, cy int) {
 		modes := p.Modes()
 		if wants(modes, e) {
 			x, y := a.paneCell(d.pane, cx, cy)
-			p.Input(e.Encode(x, y, modes.MouseSGR))
+			p.TryInput(e.Encode(x, y, modes.MouseSGR))
 		}
 
 	case dragSelect:
@@ -227,19 +261,21 @@ func (a *App) continueDrag(e input.MouseEvent, cx, cy int) {
 // wheel scrolls a pane: its history, or its program.
 func (a *App) wheel(h hit, p *pane.Pane, modes emu.Modes, e input.MouseEvent) {
 	up := e.Button == input.MouseWheelUp
+	n := max(a.wheelN, 1) // notches (coalesced)
+	lines := n * wheelLines
 	switch {
 	case p.InCopy():
 		p.WithCopy(func(c *pane.CopyMode, src pane.Source) bool {
 			if up {
-				c.Scroll(src, -wheelLines)
+				c.Scroll(src, -lines)
 			} else {
-				c.Scroll(src, wheelLines)
+				c.Scroll(src, lines)
 			}
 			// Scrolled back to the live screen with nothing selected: done.
 			return c.Transient && c.Scrolled(src) == 0 && c.Sel == pane.SelNone
 		})
 	case modes.WantsMouse() && !e.Shift:
-		p.Input(e.Encode(h.x, h.y, modes.MouseSGR))
+		p.TryInput(bytes.Repeat(e.Encode(h.x, h.y, modes.MouseSGR), n))
 	case modes.AltScreen:
 		// A full-screen app without mouse support (less, man): arrows,
 		// as terminals do ("alternate scroll").
@@ -250,13 +286,11 @@ func (a *App) wheel(h hit, p *pane.Pane, modes emu.Modes, e input.MouseEvent) {
 		if modes.AppCursor {
 			key = "\x1bO" + key[2:]
 		}
-		for i := 0; i < wheelLines; i++ {
-			p.Input([]byte(key))
-		}
+		p.TryInput(bytes.Repeat([]byte(key), lines))
 	case up:
 		if p.EnterCopyTransient() {
 			p.WithCopy(func(c *pane.CopyMode, src pane.Source) bool {
-				c.Scroll(src, -wheelLines)
+				c.Scroll(src, -lines)
 				return c.Scrolled(src) == 0 // nothing to scroll back to
 			})
 		}

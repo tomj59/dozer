@@ -181,6 +181,15 @@ mouse '64;10;8M'
 check "mouse: wheel scrolls history" "\[3/"
 mouse '65;10;8M'
 if screen | grep -q "\[0/\|\[3/"; then bad "mouse: wheel back down returns to live"; else ok "mouse: wheel back down returns to live"; fi
+# A wheel flood (a trackpad flick) must not lock up input (H01 note).
+flood=$(for i in $(seq 1 150); do printf '\033[<64;10;8M'; done)
+t0=$(date +%s)
+for k in $(seq 1 20); do tmux send-keys -t "$S" -l "$flood"; done
+tmux send-keys -t "$S" C-a 2; sleep 0.5
+for i in $(seq 1 20); do screen | grep -q "│ \[2\] bash" && break; sleep 0.25; done
+if [ $(( $(date +%s) - t0 )) -le 5 ] && screen | grep -q "│ \[2\] bash"; then ok "mouse: 3000 wheel events don't block keys"; else bad "mouse: wheel flood blocked input ($(( $(date +%s) - t0 ))s)"; fi
+send C-a 1
+send q
 mouse '0;1;3M'; mouse '32;2;4M'; mouse '0;2;4m'
 sleep 0.3
 if [ "$( (tmux show-buffer 2>/dev/null; echo) | grep -Ec '^[0-9]+$')" = 2 ]; then ok "mouse: drag selects and copies"; else bad "mouse: drag selects and copies"; tmux list-buffers; fi

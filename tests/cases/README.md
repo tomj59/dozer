@@ -47,7 +47,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 
 | ID | Case | Milestone | Result |
 |---|---|---|---|
-| H01 | [Scrollback and copy mode (C-a [)](H01-scrollback.sh) | M4 | |
+| H01 | [Scrollback and copy mode (C-a [)](H01-scrollback.sh) | M4 | PASS · Terminal.app · 2026-09-26; note: a trackpad flick locked input until its wheel events drained → fixed (timer frame limit, wheel coalescing, queued pane input) |
 | H02 | [Copy to the clipboard (v, V, y)](H02-copy-clipboard.sh) | M4 | |
 | H03 | [Search in copy mode (/ ? n N)](H03-search.sh) | M4 | |
 | H04 | [Resize reflow (re-test of E01)](H04-reflow.sh) | M4 | |

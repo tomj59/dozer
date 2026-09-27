@@ -49,6 +49,7 @@ type App struct {
 	full    layout.Result // the full layout, even when zoomed
 	view    view
 	drag    drag // mouse drag in progress
+	wheelN  int  // wheel notches in the event being handled (coalesced)
 	flash   string
 	flashAt time.Time
 
@@ -115,7 +116,12 @@ func Run(cfg *config.Config, o Options) (err error) {
 	defer signal.Stop(winch)
 
 	a.mark()
+	// Frames are rate-limited with a timer, never a sleep: the loop keeps
+	// handling input while a frame is pending, so a burst of events (a
+	// trackpad flick sends hundreds of wheel reports) can't queue up behind
+	// rendering and freeze the keyboard.
 	var last time.Time
+	var frameDue <-chan time.Time
 	for {
 		select {
 		case <-a.quit:
@@ -130,9 +136,17 @@ func Run(cfg *config.Config, o Options) (err error) {
 			if cfg.QuitWhenAllExited && a.allDead() {
 				return nil
 			}
-			if d := time.Since(last); d < frame {
-				time.Sleep(frame - d) // coalesce bursts of output into one frame
+			if frameDue != nil {
+				break // a frame is already scheduled
 			}
+			if d := time.Since(last); d < frame {
+				frameDue = time.After(frame - d)
+				break
+			}
+			a.render()
+			last = time.Now()
+		case <-frameDue:
+			frameDue = nil
 			a.render()
 			last = time.Now()
 		}
@@ -209,9 +223,9 @@ func (a *App) readInput() {
 		if a.cfg.Mouse {
 			data, events = mice.Feed(data)
 		}
-		for _, ev := range events {
-			ev := ev
-			a.call(func() { a.mouse(ev) })
+		for _, w := range coalesceWheel(events) {
+			w := w
+			a.call(func() { a.mouseN(w.ev, w.n) })
 		}
 		for _, act := range router.Feed(data) {
 			switch act.Kind {
