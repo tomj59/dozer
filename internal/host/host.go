@@ -5,6 +5,7 @@ package host
 
 import (
 	"bytes"
+	"encoding/base64"
 	"os"
 	"strings"
 	"sync"
@@ -153,6 +154,13 @@ func (t *Terminal) Mirror(m emu.Modes) {
 		_, _ = t.Out.WriteString(b.String())
 		t.applied = m
 	}
+}
+
+// SetClipboard puts text on the system clipboard with OSC 52.
+func (t *Terminal) SetClipboard(text string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, _ = t.Out.WriteString("\x1b]52;c;" + base64.StdEncoding.EncodeToString([]byte(text)) + "\x07")
 }
 
 // Restore undoes everything Open and Mirror did. Safe to call twice.

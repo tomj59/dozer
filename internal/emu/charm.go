@@ -66,17 +66,59 @@ func (t *charm) Cursor() (int, int, bool) {
 	return p.X, p.Y, !t.hidden
 }
 
-func (t *charm) Draw(dst uv.Screen, area uv.Rectangle) {
+func (t *charm) Draw(dst uv.Screen, area uv.Rectangle) { t.DrawFrom(dst, area, 0) }
+
+func (t *charm) HistoryLen() int             { return t.e.ScrollbackLen() }
+func (t *charm) Pushed() int                 { return t.e.Scrollback().Pushed() }
+func (t *charm) SetScrollbackSize(lines int) { t.e.SetScrollbackSize(lines) }
+
+func (t *charm) Line(y int) (uv.Line, bool) {
+	if y < 0 {
+		sb := t.e.Scrollback()
+		l := sb.Line(sb.Len() + y)
+		return l, vt.LineWrapped(l)
+	}
+	if y >= t.e.Height() {
+		return nil, false
+	}
+	w := t.e.Width()
+	l := make(uv.Line, w)
+	for x := 0; x < w; x++ {
+		if c := t.e.CellAt(x, y); c != nil {
+			l[x] = *c
+		} else {
+			l[x] = uv.EmptyCell
+		}
+	}
+	return l, vt.LineWrapped(l)
+}
+
+func (t *charm) DrawFrom(dst uv.Screen, area uv.Rectangle, top int) {
 	w, h := t.e.Width(), t.e.Height()
 	aw, ah := area.Dx(), area.Dy()
-	for y := 0; y < h && y < ah; y++ {
+	sb := t.e.Scrollback()
+	for row := 0; row < ah; row++ {
+		y := top + row
+		if y >= h {
+			break
+		}
+		var line uv.Line
+		if y < 0 {
+			line = sb.Line(sb.Len() + y)
+		}
 		for x := 0; x < w && x < aw; {
-			c := t.e.CellAt(x, y)
+			var c *uv.Cell
+			if y < 0 {
+				c = line.At(x)
+			} else {
+				c = t.e.CellAt(x, y)
+			}
 			if c == nil {
-				dst.SetCell(area.Min.X+x, area.Min.Y+y, &uv.EmptyCell)
+				dst.SetCell(area.Min.X+x, area.Min.Y+row, &uv.EmptyCell)
 				x++
 				continue
 			}
+			c = vt.StripWrap(c)
 			step := c.Width
 			if step < 1 {
 				step = 1
@@ -84,10 +126,10 @@ func (t *charm) Draw(dst uv.Screen, area uv.Rectangle) {
 			if x+step > aw { // wide glyph would straddle the pane edge
 				blank := uv.EmptyCell
 				blank.Style = c.Style
-				dst.SetCell(area.Min.X+x, area.Min.Y+y, &blank)
+				dst.SetCell(area.Min.X+x, area.Min.Y+row, &blank)
 				break
 			}
-			dst.SetCell(area.Min.X+x, area.Min.Y+y, c)
+			dst.SetCell(area.Min.X+x, area.Min.Y+row, c)
 			x += step
 		}
 	}

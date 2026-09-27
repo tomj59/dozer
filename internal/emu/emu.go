@@ -72,6 +72,29 @@ type Emulator interface {
 	Close() error
 }
 
+// History is implemented by back ends that keep scrollback. Lines are
+// addressed with y: 0 … rows-1 is the screen, and -1, -2, … go back through
+// scrollback (-1 is the newest scrolled-off line).
+type History interface {
+	// HistoryLen returns the number of scrollback lines.
+	HistoryLen() int
+
+	// Pushed counts every line that ever entered scrollback. The absolute
+	// number of line y (y < 0) is Pushed()+y, which stays put as new output
+	// arrives, so a scrolled-back view can hold its place.
+	Pushed() int
+
+	// Line returns the cells of line y without padding (nil when out of
+	// range) and whether it soft-wraps onto the next line.
+	Line(y int) (cells uv.Line, wrapped bool)
+
+	// DrawFrom paints like Draw, but with line top at the area's first row.
+	DrawFrom(dst uv.Screen, area uv.Rectangle, top int)
+
+	// SetScrollbackSize sets the scrollback capacity in lines.
+	SetScrollbackSize(lines int)
+}
+
 // Names lists the available emulator back ends.
 var Names = []string{"charm", "vt10x"}
 

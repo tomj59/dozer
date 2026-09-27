@@ -56,6 +56,7 @@ type App struct {
 	promptMsg  string       // modePrompt
 	promptBuf  []rune       //
 	promptDone func(string) //
+	promptHint string       // help text after the prompt (default: rename hints)
 
 	cmds  chan func()
 	dirty chan struct{}
@@ -203,8 +204,14 @@ func (a *App) readInput() {
 		for _, act := range router.Feed(buf[:n]) {
 			switch act.Kind {
 			case input.Forward:
-				if a.mode.Load() == modeNormal {
-					a.focused().Input(act.Data)
+				if a.mode.Load() != modeNormal {
+					break
+				}
+				if p := a.focused(); p.InCopy() {
+					data := act.Data
+					a.call(func() { a.copyInput(data) })
+				} else {
+					p.Input(act.Data)
 				}
 			case input.Command:
 				key := act.Key
@@ -274,9 +281,11 @@ func (a *App) modalInput(b []byte) {
 			switch {
 			case r == 0x1b || r == 0x03: // Esc / Ctrl-c: cancel
 				a.mode.Store(modeNormal)
+				a.promptHint = ""
 				return
 			case r == '\r' || r == '\n':
 				a.mode.Store(modeNormal)
+				a.promptHint = ""
 				a.promptDone(strings.TrimSpace(string(a.promptBuf)))
 				return
 			case r == 0x7f || r == 0x08:
@@ -347,6 +356,8 @@ func (a *App) command(key byte) {
 		a.say("sizes reset to the launch layout")
 	case ctrlL:
 		a.term.Redraw()
+	case '[':
+		a.enterCopy()
 	case 'r':
 		p := a.focused()
 		_ = p.Restart()

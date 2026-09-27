@@ -299,12 +299,22 @@ func (a *App) drawStatus(scr uv.Screen, y, w int, focusSnap pane.Snapshot, dead 
 	case a.mode.Load() == modePrompt:
 		left = " " + a.promptMsg + " " + string(a.promptBuf)
 		x := put(scr, 0, y, w, left, withBold(base, true))
-		put(scr, x+1, y, w, "  Enter = save · Esc = cancel · empty = default ", base)
+		hint := a.promptHint
+		if hint == "" {
+			hint = "Enter = save · Esc = cancel · empty = default"
+		}
+		put(scr, x+1, y, w, "  "+hint+" ", base)
 		return x, true
 	case a.prefixShown() && a.armedUntil.Load() != 0:
 		left = " RESIZE │ H J K L again to keep resizing · = reset sizes · any other key to finish "
+	case focusSnap.Copy && !a.prefixShown():
+		left = fmt.Sprintf(" COPY [%d] │ %d/%d │ hjkl move · v/V select · y copy · / ? search · n N · q exit ",
+			focus+1, focusSnap.Scrolled, focusSnap.History)
+		if a.flash != "" && time.Since(a.flashAt) < 2*time.Second {
+			left = fmt.Sprintf(" COPY [%d] │ %s ", focus+1, a.flash)
+		}
 	case a.prefixShown():
-		left = " PREFIX │ ←↑↓→ hjkl 1-9 o focus · z zoom · HJKL resize · = reset · r/R restart · x kill · t title · s bar · C-l redraw · q quit · Esc "
+		left = " PREFIX │ ←↑↓→ hjkl 1-9 o focus · z zoom · [ copy · HJKL resize · = reset · r/R restart · x kill · t title · s bar · C-l redraw · q quit · Esc "
 	default:
 		loud = false
 		name := a.cfg.Name

@@ -171,6 +171,9 @@ type Pane struct {
 	noRestart bool        // killed on purpose: skip automatic restart once
 	killed    bool        // the current death was C-a x (shown as "killed")
 	timer     *time.Timer // pending automatic restart
+
+	scrollback int       // history lines to keep (0 = emulator default)
+	cm         *CopyMode // scrolled-back view / copy mode; nil when live
 }
 
 // New creates a pane; call Start to launch its process. dirty is called
@@ -211,6 +214,10 @@ func (p *Pane) startLocked() error {
 	}
 	p.gen++
 	p.em, p.ptmx, p.cmd = em, ptmx, cmd
+	p.cm = nil
+	if h, ok := em.(emu.History); ok && p.scrollback > 0 {
+		h.SetScrollbackSize(p.scrollback)
+	}
 	p.state, p.code, p.signal, p.gaveUp, p.killed = Running, 0, "", false, false
 	p.startedAt = time.Now()
 	gen := p.gen
@@ -394,9 +401,22 @@ func (p *Pane) Resize(cols, rows int) {
 	if cols == p.cols && rows == p.rows {
 		return
 	}
+	scrolled := 0
+	if p.cm != nil {
+		scrolled = p.cm.Scrolled(p.sourceLocked())
+	}
 	p.cols, p.rows = cols, rows
 	if p.em != nil {
 		p.em.Resize(cols, rows)
+	}
+	if p.cm != nil {
+		// Reflow renumbers history; keep the same distance from the bottom.
+		src := p.sourceLocked()
+		row := p.cm.Y - p.cm.Top
+		p.cm.Top = liveTop(src) - scrolled
+		p.cm.Y = p.cm.Top + row
+		p.cm.Sel = SelNone
+		p.cm.clamp(src)
 	}
 	if p.ptmx != nil {
 		_ = pty.Setsize(p.ptmx, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
@@ -418,6 +438,12 @@ type Snapshot struct {
 	MaxRestarts      int // the limit (-1 = unlimited)
 	GaveUp           bool
 	Killed           bool // ended by C-a x, however the program reported it
+
+	// Copy mode / scrolled-back view (C-a [, mouse wheel).
+	Copy     bool
+	Scrolled int    // lines above the live screen
+	History  int    // lines of scrollback available
+	Search   string // active search term
 }
 
 // Draw paints the pane's screen into area and returns its state.
@@ -429,8 +455,16 @@ func (p *Pane) Draw(dst uv.Screen, area uv.Rectangle) Snapshot {
 	if p.em == nil {
 		return s
 	}
-	p.em.Draw(dst, area)
 	s.CursorX, s.CursorY, s.CursorVisible = p.em.Cursor()
+	if p.cm != nil {
+		src := p.sourceLocked()
+		p.cm.clamp(src)
+		p.drawCopyLocked(dst, area, src)
+		s.Copy, s.Scrolled, s.History, s.Search = true, p.cm.Scrolled(src), src.Last()-src.First()+1-src.Rows(), p.cm.SearchTerm()
+		s.CursorX, s.CursorY, s.CursorVisible = p.cm.X, p.cm.Y-p.cm.Top, true
+	} else {
+		p.em.Draw(dst, area)
+	}
 	s.Modes = p.em.Modes()
 	s.Title = p.em.Title()
 	if s.State.Dead() {
