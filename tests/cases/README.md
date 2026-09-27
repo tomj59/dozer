@@ -47,7 +47,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 
 | ID | Case | Milestone | Result |
 |---|---|---|---|
-| K01 | [Focus navigation](K01-focus.sh) | M1 | |
+| K01 | [Focus navigation](K01-focus.sh) | M1 | PASS (arrows, hjkl, 1-5, o; typing only in focused pane) · Terminal.app · 2026-09-26 |
 | K02 | [Zoom](K02-zoom.sh) | M1 | |
 | K03 | [Runtime resize (H J K L) and reset (=)](K03-resize.sh) | M2 | |
 | K04 | [Rename (t) and status bar toggle (s)](K04-rename-statusbar.sh) | M2 | |
