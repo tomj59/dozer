@@ -162,3 +162,27 @@ func itoa(n int) string {
 	}
 	return string(b)
 }
+
+// Modes returns the terminal modes the pane's program asked for (none once
+// it has ended).
+func (p *Pane) Modes() emu.Modes {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.em == nil || p.state.Dead() {
+		return emu.Modes{}
+	}
+	return p.em.Modes()
+}
+
+// EnterCopyTransient starts copy mode for the mouse: it ends by itself once
+// a drag is copied or the wheel scrolls back to the bottom.
+func (p *Pane) EnterCopyTransient() bool {
+	if p.InCopy() {
+		return true
+	}
+	if !p.EnterCopy() {
+		return false
+	}
+	p.WithCopy(func(c *CopyMode, _ Source) bool { c.Transient = true; return false })
+	return true
+}

@@ -100,10 +100,15 @@ func (a *App) render() {
 		}
 	}
 
-	// Mouse passthrough needs coordinate translation per pane (M4); until
-	// then only key, paste and focus modes are mirrored.
+	// dozer takes the host mouse itself (button + drag reports, SGR) and
+	// passes events on per pane; any-motion tracking only while the
+	// focused program wants hover events.
 	m := focusSnap.Modes
+	any := m.MouseAny
 	m.MouseX10, m.MouseNormal, m.MouseButton, m.MouseAny, m.MouseSGR = false, false, false, false, false
+	if a.cfg.Mouse {
+		m.MouseButton, m.MouseSGR, m.MouseAny = true, true, any
+	}
 	a.term.Mirror(m)
 
 	show := cursorOn && !a.prefixShown() && a.mode.Load() != modeConfirm

@@ -68,9 +68,14 @@ func (t *charm) Cursor() (int, int, bool) {
 
 func (t *charm) Draw(dst uv.Screen, area uv.Rectangle) { t.DrawFrom(dst, area, 0) }
 
-func (t *charm) HistoryLen() int             { return t.e.ScrollbackLen() }
-func (t *charm) Pushed() int                 { return t.e.Scrollback().Pushed() }
-func (t *charm) SetScrollbackSize(lines int) { t.e.SetScrollbackSize(lines) }
+func (t *charm) HistoryLen() int { return t.e.ScrollbackLen() }
+func (t *charm) Pushed() int     { return t.e.Scrollback().Pushed() }
+func (t *charm) SetScrollbackSize(lines int) {
+	t.e.SetScrollbackSize(max(lines, 1)) // the emulator needs at least one line
+	if lines == 0 {
+		t.e.ClearScrollback()
+	}
+}
 
 func (t *charm) Line(y int) (uv.Line, bool) {
 	if y < 0 {

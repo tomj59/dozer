@@ -499,33 +499,7 @@ func MoveBorder(root *Node, pane, dx, dy int, r Result, m Min) bool {
 		if a < 0 || a+1 >= len(split.Children) {
 			continue
 		}
-		lens := make([]int, len(split.Children))
-		mins := make([]int, len(split.Children))
-		for j, ch := range split.Children {
-			e := Extent(ch, r)
-			mw, mh := minSize(ch, m)
-			if dir == Cols {
-				lens[j], mins[j] = e.W, mw
-			} else {
-				lens[j], mins[j] = e.H, mh
-			}
-		}
-		// Moving the border by delta grows child a and shrinks a+1.
-		d := delta
-		if d > 0 {
-			d = min(d, lens[a+1]-mins[a+1])
-		} else {
-			d = max(d, mins[a]-lens[a])
-		}
-		if d == 0 {
-			return false
-		}
-		lens[a] += d
-		lens[a+1] -= d
-		for j, ch := range split.Children {
-			ch.Size = Size{Value: float64(lens[j]), Unit: Weight}
-		}
-		return true
+		return resizeSplit(split, a, delta, r, m)
 	}
 	return false
 }
@@ -537,4 +511,64 @@ func indexOf(list []*Node, n *Node) int {
 		}
 	}
 	return -1
+}
+
+// DragBorder moves the border on one side of pane — after it (right or
+// bottom) or before it (left or top) — by delta cells along dir. It is the
+// mouse version of MoveBorder: the border under the pointer moves with it.
+func DragBorder(root *Node, pane int, dir Dir, before bool, delta int, r Result, m Min) bool {
+	if delta == 0 {
+		return false
+	}
+	p := path(root, pane)
+	for i := len(p) - 2; i >= 0; i-- {
+		split := p[i]
+		if split.Dir != dir || len(split.Children) < 2 {
+			continue
+		}
+		k := indexOf(split.Children, p[i+1])
+		a := k
+		if before {
+			a = k - 1
+		}
+		if a < 0 || a+1 >= len(split.Children) {
+			continue
+		}
+		return resizeSplit(split, a, delta, r, m)
+	}
+	return false
+}
+
+// resizeSplit moves the border between children a and a+1 of split by
+// delta cells, within minimum sizes. Sizes become weights equal to their
+// current cells.
+func resizeSplit(split *Node, a, delta int, r Result, m Min) bool {
+	dir := split.Dir
+	lens := make([]int, len(split.Children))
+	mins := make([]int, len(split.Children))
+	for j, ch := range split.Children {
+		e := Extent(ch, r)
+		mw, mh := minSize(ch, m)
+		if dir == Cols {
+			lens[j], mins[j] = e.W, mw
+		} else {
+			lens[j], mins[j] = e.H, mh
+		}
+	}
+	// Moving the border by delta grows child a and shrinks a+1.
+	d := delta
+	if d > 0 {
+		d = min(d, lens[a+1]-mins[a+1])
+	} else {
+		d = max(d, mins[a]-lens[a])
+	}
+	if d == 0 {
+		return false
+	}
+	lens[a] += d
+	lens[a+1] -= d
+	for j, ch := range split.Children {
+		ch.Size = Size{Value: float64(lens[j]), Unit: Weight}
+	}
+	return true
 }

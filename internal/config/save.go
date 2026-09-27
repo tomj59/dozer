@@ -55,6 +55,12 @@ func (c *Config) YAML(header string) ([]byte, error) {
 	if c.MinPane != def.MinPane {
 		add("min_pane", flow(str("w"), lit(strconv.Itoa(c.MinPane.W)), str("h"), lit(strconv.Itoa(c.MinPane.H))))
 	}
+	if !c.Mouse {
+		add("mouse", lit("false"))
+	}
+	if c.Scrollback != def.Scrollback {
+		add("scrollback", lit(strconv.Itoa(c.Scrollback)))
+	}
 	if c.StatusBar != "" && c.StatusBar != def.StatusBar {
 		add("status_bar", str(c.StatusBar))
 	}

@@ -71,7 +71,7 @@ func TestParseErrors(t *testing.T) {
 }
 
 func TestWarningsAndShorthands(t *testing.T) {
-	c, err := Parse([]byte("mouse: true\npanes: [\"git status\", {exec: top, group: hosts}]\nprefix: C-b\nenv: {A: x}"), "/base")
+	c, err := Parse([]byte("multi_input: true\npanes: [\"git status\", {exec: top, group: hosts}]\nprefix: C-b\nenv: {A: x}"), "/base")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestWarningsAndShorthands(t *testing.T) {
 		t.Errorf("default env not inherited: %+v", c.Panes[2])
 	}
 	if len(c.Warnings) != 2 {
-		t.Errorf("warnings = %v, want mouse + group", c.Warnings)
+		t.Errorf("warnings = %v, want multi_input + group", c.Warnings)
 	}
 }
 
@@ -216,5 +216,25 @@ func TestTildeCwd(t *testing.T) {
 		if c2, err := Parse(out, ""); err != nil || c2.Panes[0].Run != v {
 			t.Errorf("run %q did not survive --save: %v\n%s", v, err, out)
 		}
+	}
+}
+
+func TestMouseAndScrollback(t *testing.T) {
+	c, err := Parse([]byte("mouse: false\nscrollback: 500\n"), "/base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Mouse || c.Scrollback != 500 || len(c.Warnings) != 0 {
+		t.Fatalf("mouse=%v scrollback=%d warnings=%v", c.Mouse, c.Scrollback, c.Warnings)
+	}
+	if d := Defaults(); !d.Mouse || d.Scrollback != DefaultScrollback {
+		t.Fatalf("defaults: %+v", d)
+	}
+	y, err := c.YAML("")
+	if err != nil || !strings.Contains(string(y), "mouse: false") || !strings.Contains(string(y), "scrollback: 500") {
+		t.Fatalf("save: %v\n%s", err, y)
+	}
+	if _, err := Parse([]byte("scrollback: -1"), "/"); err == nil {
+		t.Fatal("negative scrollback accepted")
 	}
 }

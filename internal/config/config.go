@@ -32,8 +32,16 @@ type Config struct {
 	MinPane           layout.Min
 	QuitWhenAllExited bool
 	StatusBar         string   // "bottom" (default), "top" or "off"
+	Mouse             bool     // dozer handles the mouse (default true)
+	Scrollback        int      // history lines per pane
 	Warnings          []string // accepted but not implemented yet, etc.
 }
+
+// Scrollback limits, in lines per pane.
+const (
+	DefaultScrollback = 10000
+	MaxScrollback     = 1000000
+)
 
 // file mirrors the YAML schema.
 type file struct {
@@ -51,10 +59,11 @@ type file struct {
 	MinPane           *struct{ W, H int } `yaml:"min_pane"`
 	QuitWhenAllExited bool                `yaml:"quit_when_all_exited"`
 
+	Mouse      *bool  `yaml:"mouse"`
+	Scrollback *int   `yaml:"scrollback"`
+	StatusBar  string `yaml:"status_bar"`
+
 	// Accepted now, implemented in later milestones.
-	Mouse      yaml.Node `yaml:"mouse"`
-	Scrollback yaml.Node `yaml:"scrollback"`
-	StatusBar  string    `yaml:"status_bar"`
 	MultiInput yaml.Node `yaml:"multi_input"`
 	Keys       yaml.Node `yaml:"keys"`
 }
@@ -93,7 +102,7 @@ func pathOf(n *yaml.Node) string {
 // Defaults returns the configuration for a bare `dozer`.
 func Defaults() *Config {
 	root, _ := layout.Parse("default")
-	return &Config{Layout: root, Panes: make([]pane.Spec, root.Panes()), Prefix: 0x01, MinPane: layout.Min{W: 20, H: 5}, StatusBar: "bottom"}
+	return &Config{Layout: root, Panes: make([]pane.Spec, root.Panes()), Prefix: 0x01, MinPane: layout.Min{W: 20, H: 5}, StatusBar: "bottom", Mouse: true, Scrollback: DefaultScrollback}
 }
 
 // Load reads and resolves a YAML config file, or the config embedded in a
@@ -132,8 +141,7 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 	c.Name = f.Name
 	c.Description = strings.TrimRight(f.Description, "\n")
 
-	for key, n := range map[string]*yaml.Node{"mouse": &f.Mouse, "scrollback": &f.Scrollback,
-		"multi_input": &f.MultiInput, "keys": &f.Keys} {
+	for key, n := range map[string]*yaml.Node{"multi_input": &f.MultiInput, "keys": &f.Keys} {
 		if n.Kind != 0 {
 			c.Warnings = append(c.Warnings, fmt.Sprintf("line %d: %q is not implemented yet; ignored", n.Line, key))
 		}
@@ -154,6 +162,15 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 		c.MinPane = layout.Min{W: f.MinPane.W, H: f.MinPane.H}
 	}
 	c.QuitWhenAllExited = f.QuitWhenAllExited
+	if f.Mouse != nil {
+		c.Mouse = *f.Mouse
+	}
+	if f.Scrollback != nil {
+		if *f.Scrollback < 0 || *f.Scrollback > MaxScrollback {
+			return nil, fmt.Errorf("scrollback must be 0 to %d lines", MaxScrollback)
+		}
+		c.Scrollback = *f.Scrollback
+	}
 	switch f.StatusBar {
 	case "":
 	case "top", "bottom", "off":
@@ -529,6 +546,7 @@ func (c *Config) Describe() string {
 		}
 	}
 	fmt.Fprintf(&b, "prefix: C-%c   min pane: %dx%d   status bar: %s   quit when all exited: %v\n", 'a'+c.Prefix-1, c.MinPane.W, c.MinPane.H, c.StatusBar, c.QuitWhenAllExited)
+	fmt.Fprintf(&b, "mouse: %v   scrollback: %d lines\n", c.Mouse, c.Scrollback)
 	fmt.Fprintf(&b, "layout: %s\n", describeNode(c.Layout))
 	for i, p := range c.Panes {
 		what := "shell"

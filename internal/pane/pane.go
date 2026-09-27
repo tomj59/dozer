@@ -172,14 +172,14 @@ type Pane struct {
 	killed    bool        // the current death was C-a x (shown as "killed")
 	timer     *time.Timer // pending automatic restart
 
-	scrollback int       // history lines to keep (0 = emulator default)
+	scrollback int       // history lines to keep (-1 = emulator default)
 	cm         *CopyMode // scrolled-back view / copy mode; nil when live
 }
 
 // New creates a pane; call Start to launch its process. dirty is called
 // (from background goroutines) whenever the pane's display changes.
 func New(id int, spec Spec, emuName string, cols, rows int, dirty func()) *Pane {
-	return &Pane{ID: id, Spec: spec, emuName: emuName, cols: max(cols, 1), rows: max(rows, 1), dirty: dirty}
+	return &Pane{ID: id, Spec: spec, emuName: emuName, cols: max(cols, 1), rows: max(rows, 1), dirty: dirty, scrollback: -1}
 }
 
 // Start launches (or relaunches) the pane's process on a fresh screen.
@@ -215,7 +215,7 @@ func (p *Pane) startLocked() error {
 	p.gen++
 	p.em, p.ptmx, p.cmd = em, ptmx, cmd
 	p.cm = nil
-	if h, ok := em.(emu.History); ok && p.scrollback > 0 {
+	if h, ok := em.(emu.History); ok && p.scrollback >= 0 {
 		h.SetScrollbackSize(p.scrollback)
 	}
 	p.state, p.code, p.signal, p.gaveUp, p.killed = Running, 0, "", false, false

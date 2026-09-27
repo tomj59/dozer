@@ -48,6 +48,7 @@ type App struct {
 	res     layout.Result // what's on screen (zoomed or full)
 	full    layout.Result // the full layout, even when zoomed
 	view    view
+	drag    drag // mouse drag in progress
 	flash   string
 	flashAt time.Time
 
@@ -189,6 +190,7 @@ func repeatable(key byte) bool { return key == 'H' || key == 'J' || key == 'K' |
 // readInput routes raw keyboard bytes: to the focused pane, or to commands.
 func (a *App) readInput() {
 	router := input.NewRouter(a.cfg.Prefix)
+	var mice input.MouseFilter
 	buf := make([]byte, 4096)
 	for {
 		n, err := a.term.In.Read(buf)
@@ -201,7 +203,15 @@ func (a *App) readInput() {
 			a.call(func() { a.modalInput(data) })
 			continue
 		}
-		for _, act := range router.Feed(buf[:n]) {
+		data, events := buf[:n], []input.MouseEvent(nil)
+		if a.cfg.Mouse {
+			data, events = mice.Feed(data)
+		}
+		for _, ev := range events {
+			ev := ev
+			a.call(func() { a.mouse(ev) })
+		}
+		for _, act := range router.Feed(data) {
 			switch act.Kind {
 			case input.Forward:
 				if a.mode.Load() != modeNormal {
