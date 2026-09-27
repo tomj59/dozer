@@ -59,9 +59,9 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 | ID | Case | Milestone | Result |
 |---|---|---|---|
 | L01 | [Default 2,1 layout](L01-default-layout.sh) | M1 | PASS (layout, dividers, titles) · Terminal.app · 2026-09-26; resize not reported |
-| L02 | [Alternative 2,2,1 layout](L02-two-two-one.sh) | M1 | |
-| L03 | [Launch sizes: percent, cells, weights](L03-sizes.sh) | M1 | |
-| L04 | [Tree layout: tall left, stacked right](L04-tree.sh) | M1 | |
+| L02 | [Alternative 2,2,1 layout](L02-two-two-one.sh) | M1 | PASS (rows re-proportion tall/short) · Terminal.app · 2026-09-26 |
+| L03 | [Launch sizes: percent, cells, weights](L03-sizes.sh) | M1 | PASS (70/30 height, 30/70 top, 24c + 1fr:2fr bottom measured) · Terminal.app · 2026-09-26 |
+| L04 | [Tree layout: tall left, stacked right](L04-tree.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | L05 | [Maximum: nine panes (3,3,3)](L05-nine-panes.sh) | M1 | |
 | L06 | [Window too small: minimum size + scrolling view (DP-1)](L06-small-window.sh) | M1 | |
 
