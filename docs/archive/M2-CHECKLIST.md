@@ -1,6 +1,6 @@
 # M2 checklist: runtime controls
 
-New keys since M1 (see [QUICKSTART.md](QUICKSTART.md) §2). About 10 minutes.
+New keys since M1 (see [QUICKSTART.md](../QUICKSTART.md) §2). About 10 minutes.
 
 ```sh
 cd ~/claude/Projects/tui-multi-shell/dozer && make && make test && bin/dozer

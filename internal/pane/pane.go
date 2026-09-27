@@ -73,7 +73,12 @@ func (s Spec) Argv() []string {
 		return []string{sh, "-lc", s.Exec}
 	case s.Run != "":
 		// DP-4: run the command in an interactive shell, then stay at a prompt.
-		return []string{sh, "-ic", s.Run + "; exec " + sh}
+		// The trap keeps Ctrl-C for the command: without it, bash and zsh
+		// end the whole -c list when the command dies of SIGINT, and the
+		// pane died instead of dropping to a prompt. (A trap set to a
+		// command isn't inherited, so the command still gets Ctrl-C, and
+		// exec gives the new shell default handling again.)
+		return []string{sh, "-ic", "trap : INT; " + s.Run + "; exec " + sh}
 	default:
 		return []string{sh, "-l"}
 	}
@@ -172,13 +177,13 @@ type Pane struct {
 	killed    bool        // the current death was C-a x (shown as "killed")
 	timer     *time.Timer // pending automatic restart
 
-	scrollback int       // history lines to keep (-1 = emulator default)
+	scrollback int // history lines to keep (-1 = emulator default)
 
 	// Input to the program goes through a queue and a writer goroutine, so
 	// a program that stops reading can't block the caller (the UI loop).
 	in     chan []byte
 	inDone chan struct{} // closed when the current process is stopped
-	cm         *CopyMode // scrolled-back view / copy mode; nil when live
+	cm     *CopyMode     // scrolled-back view / copy mode; nil when live
 }
 
 // New creates a pane; call Start to launch its process. dirty is called

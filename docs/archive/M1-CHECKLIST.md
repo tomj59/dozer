@@ -1,6 +1,6 @@
 # M1 checklist: multi-pane on the Mac
 
-Read [QUICKSTART.md](QUICKSTART.md) first. It covers every key and flag used here. About 20–30 minutes. Note your terminal app (Terminal, iTerm2, …).
+Read [QUICKSTART.md](../QUICKSTART.md) first. It covers every key and flag used here. About 20–30 minutes. Note your terminal app (Terminal, iTerm2, …).
 
 ```sh
 cd ~/claude/Projects/tui-multi-shell/dozer && make && make test

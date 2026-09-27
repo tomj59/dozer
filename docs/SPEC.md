@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.17 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.18 (spec revision; the software is at v0.4.0) · Owner: Tom · Last updated: 2026-09-27
 
 ## 1. Summary
 
@@ -29,7 +29,7 @@ A bare `dozer` launches the default 3-pane layout with an interactive `$SHELL` i
 | Name | **dozer** | Win-*dows* meets construction equipment. The binary, module and config paths all use it. |
 | Pane borders | **Thin, shared one-line dividers** (tmux-style) | Maximizes pane space. Pane titles sit inline in the divider above each pane, and the focused pane's divider is highlighted. |
 | Prefix key | `C-a` default, fully configurable (`prefix:` in YAML, `--prefix`) | Picked for familiarity from GNU screen. `C-a C-a` sends a literal `C-a` through. We'll adjust after real use. |
-| `run:` start-up | `$SHELL -ic '<cmd>; exec $SHELL'` | Reliable, with no race against shell start-up. The cost is that the command isn't in shell history. See DP-4. |
+| `run:` start-up | `$SHELL -ic 'trap : INT; <cmd>; exec $SHELL'` | Reliable, with no race against shell start-up. The cost is that the command isn't in shell history. See DP-4. |
 | Platforms | Linux, macOS. Windows is out of scope. | `creack/pty` covers Unix PTYs. Windows ConPTY could come later behind the PTY interface. |
 
 ## 3. Why this is feasible (and where the work is)
@@ -46,6 +46,8 @@ The rest (layout solving, key routing, borders, status bar) is ordinary applicat
 ## 4. User-facing behavior
 
 ### 4.1 Launch modes
+
+> User guide: [`CLI.md`](CLI.md).
 
 ```
 dozer                                 # default layout, $SHELL in cwd in every pane
@@ -78,7 +80,7 @@ A "square" pane isn't guaranteed. Terminal cells are about 1:2 (width:height), s
 
 | Key | Meaning |
 |---|---|
-| `run: <cmd>` | Runs `$SHELL -ic '<cmd>; exec $SHELL'`: the command runs in an interactive shell, and when it ends you're back at a prompt in that pane. The command doesn't land in shell history (DP-4). **Default for `-p`.** |
+| `run: <cmd>` | Runs `$SHELL -ic 'trap : INT; <cmd>; exec $SHELL'`: the command runs in an interactive shell, and when it ends (or you stop it with Ctrl-C) you're back at a prompt in that pane. The command doesn't land in shell history (DP-4). **Default for `-p`.** |
 | `exec: <cmd>` | The pane process *is* `$SHELL -lc "<cmd>"`. When it ends, the pane becomes a dead pane (§4.10). |
 | (neither) | Plain interactive `$SHELL`. |
 
@@ -285,6 +287,8 @@ Scheduled after M5; see the roadmap. Nothing is exposed in the config yet.
 
 ### 4.12 Packaged workspaces (`--package`)
 
+> User guide: [`PACKAGING.md`](PACKAGING.md).
+
 `dozer <flags or -c file> --package my-tool` writes **`my-tool.sh`**, one self-contained POSIX `sh` script. **The script is the whole package.** It carries its configuration inside, and running it reads and writes no other files. It does three things:
 
 1. **Checks the environment:** a `dozer` binary is on `PATH` (or at `$DOZER_BIN`), and it's running in a terminal.
@@ -304,7 +308,7 @@ To change a package: `./my-tool.sh --show-config > my-tool.yaml`, edit, then `do
 
 - The script never refers to its own location.
 - cwd and env are embedded **exactly as written** (`sub`, `~/work`, `$HOME`), not as expanded on the packaging machine, and they resolve when the script runs.
-- A relative `cwd` resolves against the folder you run the script from. `~` and `$VARS` resolve for whoever runs it.
+- A relative `cwd` resolves against the folder you run the script from (or, when a package is loaded as a file with `dozer -c`, against its folder). `~` and `$VARS` resolve for whoever runs it.
 - Only absolute paths the author wrote stay absolute.
 
 **Inline equivalents** (the same config-without-a-file path the package uses):
@@ -317,6 +321,8 @@ To change a package: `./my-tool.sh --show-config > my-tool.yaml`, edit, then `do
 **Dependency:** dozer itself. See DP-6 for making packages carry it.
 
 ## 5. Configuration (YAML)
+
+> The user guide and full key reference is [`CONFIG.md`](CONFIG.md). This section is the design view.
 
 Locations: `-c <file>`, otherwise `./.dozer.yaml`, otherwise `~/.config/dozer/config.yaml` (XDG). CLI flags override the file.
 
@@ -362,10 +368,10 @@ keys:                      # optional overrides
 
 Validation errors are reported with the line number. `dozer --check <file>` validates a file and prints the resolved layout and panes without launching anything.
 
-**Implemented so far (M1):**
+**Implemented so far (v0.4.0):**
 
 - Top-level keys: `version`, `name`, `description` (free text: shown by `--check`, in package headers, and to every pane as `$DOZER_DESCRIPTION`), `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths` (sizes also accept `auto`), `panes` (list or named map), `min_pane`, `quit_when_all_exited`, `status_bar` (M2), `mouse`, `scrollback` (M4).
-- Pane keys: `title`, `run`, `exec`, `cwd`, `env`, `shell`, `restart`.
+- Pane keys: `title`, `run`, `exec`, `cwd`, `env`, `shell`, `restart`, `max_restarts`.
 - A bare string in the pane list is shorthand for `run:`.
 
 Keys from later milestones are accepted but produce a warning in `--check` (they're ignored for now):
@@ -441,13 +447,15 @@ These are designed in from the start, even where v1 uses only one implementation
 
 ## 9. Roadmap
 
+Versions follow the milestones: `v0.<milestone>.<fix>` until 1.0 (see `CHANGELOG.md`).
+
 | Milestone | Scope |
 |---|---|
-| **M0 Spike** ✅ (Mac: basics, cursor fix confirmed; sections 2–3 pending) | One pane in full screen, driven through the chosen emulator. Pass criteria: vim, htop, and `less` all work, resize is correct, `cat` of a large file stays smooth. Decide the emulator library and the input approach. |
-| **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
-| **M2 Control** (Linux ✅, Mac pending) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
-| **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
-| **M4 History & mouse** (Linux ✅, Mac pending: cases H01–H04, M01–M05) | Scrollback ring, scroll/copy mode with search, clipboard (OSC 52 + local command), **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
+| **M0 Spike** ✅ v0.1.0 (Mac ✅: E02–E04; E01 and E05 partial, resolved in M4) | One pane in full screen, driven through the chosen emulator. Pass criteria: vim, htop, and `less` all work, resize is correct, `cat` of a large file stays smooth. Decide the emulator library and the input approach. |
+| **M1 Layouts** ✅ v0.2.0 (Mac ✅: L01–L06) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
+| **M2 Control** ✅ v0.3.0 (Mac ✅: K01–K06, D01–D06, C01–C03, P01) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
+| **M3 Config** ✅ (folded into M1–M2, v0.3.0) | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
+| **M4 History & mouse** ✅ v0.4.0 (Linux ✅; Mac: H01 ✅, H02 partial and copy/paste parked (DP-9), H03–H04 and M01–M05 pending) | Scrollback ring, scroll/copy mode with search, clipboard (OSC 52 + local command), **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
 | **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
 | **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
@@ -538,7 +546,7 @@ Small patches (about 50 lines; three for speed, one for a data race, recorded in
 
 **Status:** decided for v1; revisit at functional review.
 
-`run:` uses `$SHELL -ic '<cmd>; exec $SHELL'`. The alternative, typing the command into a live shell after it starts, puts the command in history but races with shell start-up because there's no reliable "prompt ready" signal. If real use shows history matters, add `run_mode: type` with a start-up delay as an opt-in. It needs no structural change either way.
+`run:` uses `$SHELL -ic 'trap : INT; <cmd>; exec $SHELL'`. (The `trap` was added in v0.4.0: without it, bash and zsh end the whole command list when the command is stopped with Ctrl-C, so the pane died instead of dropping to a prompt. Found in H01.) The alternative, typing the command into a live shell after it starts, puts the command in history but races with shell start-up because there's no reliable "prompt ready" signal. If real use shows history matters, add `run_mode: type` with a start-up delay as an opt-in. It needs no structural change either way.
 
 ### DP-5 · Who owns a pane's colors
 

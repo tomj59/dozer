@@ -119,8 +119,8 @@ func TestArgvAndLabel(t *testing.T) {
 	}{
 		{Spec{Shell: "/bin/zsh"}, "/bin/zsh -l", "zsh"},
 		{Spec{Shell: "/bin/zsh", Exec: "htop"}, "/bin/zsh -lc htop", "htop"},
-		{Spec{Shell: "/bin/zsh", Run: "ssh a"}, "/bin/zsh -ic ssh a; exec /bin/zsh", "ssh a"},
-		{Spec{Shell: "/bin/zsh", Run: "ssh a", Title: "API"}, "/bin/zsh -ic ssh a; exec /bin/zsh", "API"},
+		{Spec{Shell: "/bin/zsh", Run: "ssh a"}, "/bin/zsh -ic trap : INT; ssh a; exec /bin/zsh", "ssh a"},
+		{Spec{Shell: "/bin/zsh", Run: "ssh a", Title: "API"}, "/bin/zsh -ic trap : INT; ssh a; exec /bin/zsh", "API"},
 	}
 	for _, c := range cases {
 		if got := strings.Join(c.spec.Argv(), " "); got != c.argv {

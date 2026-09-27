@@ -1,6 +1,6 @@
 # M0 checklist: Mac verification
 
-New to dozer? Read [QUICKSTART.md](QUICKSTART.md) first; it teaches everything this checklist uses.
+New to dozer? Read [QUICKSTART.md](../QUICKSTART.md) first; it teaches everything this checklist uses.
 
 > **Since M1:** a bare `bin/dozer` opens three panes. For this checklist, use **`bin/dozer -l 1`** (one pane) wherever it says `bin/dozer`. Redraw moved from `Ctrl-a l` to **`Ctrl-a Ctrl-l`**.
 

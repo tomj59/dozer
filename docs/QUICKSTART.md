@@ -1,6 +1,6 @@
 # dozer quickstart
 
-This page teaches you to use dozer as it exists today (M4: multiple panes with runtime controls, scrollback, copy mode and the mouse). When you've finished it, the test cases in [`tests/cases/`](../tests/cases/README.md) are where you check that it works (§8).
+This page teaches you to use dozer in about ten minutes: panes, the command key, layouts, scrollback and the mouse. When you want to build your own workspaces, go on to the [configuration guide](CONFIG.md).
 
 ## What you're looking at
 
@@ -14,7 +14,7 @@ tomj@mac ~/dozer %                 │* db5558e Add QUICKSTART …
 ─ [3] zsh ─────────────────────────────────────────────────────────────────
 tomj@mac ~/dozer %
 
- dozer │ [1] zsh                                       C-a q quit │ 6152094   ← status bar
+ dozer │ [1] zsh                                        C-a q quit │ v0.4.0   ← status bar
 ```
 
 - **Title line:** the pane number, its label, and its state when the process has ended. The pane you're typing into (the **focused** pane) has a bright cyan title.
@@ -22,17 +22,21 @@ tomj@mac ~/dozer %
 
 The default layout is `2,1`: two panes on top, one wide pane below. Every pane starts your shell in the folder you launched from.
 
-## 1. Build it
+## 1. Install it
+
+From the dozer folder (needs Go 1.24 or later):
 
 ```sh
-cd ~/claude/Projects/tui-multi-shell/dozer
-make              # builds bin/dozer
+make install                  # builds dozer and copies it to /usr/local/bin
+make install PREFIX=~/.local  # or into ~/.local/bin
 ```
+
+The examples below run `dozer` from your `PATH`. (`make` alone builds `bin/dozer`; use `bin/dozer` in the examples if you haven't installed it.)
 
 ## 2. Start it and move around
 
 ```sh
-bin/dozer
+dozer
 ```
 
 You get three shells. Typing goes to the focused pane: pane `[1]`, top left. To use the others you need the **prefix key**.
@@ -73,19 +77,19 @@ Try it now:
 
 | Command | Result |
 |---|---|
-| `bin/dozer` | Default `2,1` layout, a shell in each pane |
-| `bin/dozer -l 2,2,1` | Rows of 2, 2 and 1 panes |
-| `bin/dozer -l 3` / `-l 1,3` / `-l 3,3` | Any row pattern, up to 9 panes |
-| `bin/dozer -l 2,1 --heights 70,30` | Top row 70% of the height |
-| `bin/dozer -l 2,1 --widths 1:30,70` | Row 1 split 30% / 70% |
-| `bin/dozer -p top -p 'git log'` | **Run** commands in panes 1, 2, … (you get a prompt when each finishes) |
-| `bin/dozer -x 'tail -f log'` | **Exec**: the pane *is* the command; when it ends, the pane is dead (§4) |
-| `bin/dozer -p a -p b -p c -p d` | No `-l`: the layout is fitted to the commands (4 → `2,2`) |
-| `printf 'top\ngit status\n' \| bin/dozer` | Piped: one pane command per line |
-| `bin/dozer --prefix C-b` | Use `Ctrl-b` as the prefix instead |
-| `bin/dozer -l 2,1 -p htop --save my.yaml` | Don't launch; write what you'd get as a config file (`--save -` prints it) |
+| `dozer` | Default `2,1` layout, a shell in each pane |
+| `dozer -l 2,2,1` | Rows of 2, 2 and 1 panes |
+| `dozer -l 3` / `-l 1,3` / `-l 3,3` | Any row pattern, up to 9 panes |
+| `dozer -l 2,1 --heights 70,30` | Top row 70% of the height |
+| `dozer -l 2,1 --widths 1:30,70` | Row 1 split 30% / 70% |
+| `dozer -p top -p 'git log'` | **Run** commands in panes 1, 2, … (you get a prompt when each finishes) |
+| `dozer -x 'tail -f log'` | **Exec**: the pane *is* the command; when it ends, the pane is dead (§4) |
+| `dozer -p a -p b -p c -p d` | No `-l`: the layout is fitted to the commands (4 → `2,2`) |
+| `printf 'top\ngit status\n' \| dozer` | Piped: one pane command per line |
+| `dozer --prefix C-b` | Use `Ctrl-b` as the prefix instead |
+| `dozer -l 2,1 -p htop --save my.yaml` | Don't launch; write what you'd get as a config file (`--save -` prints it) |
 
-Sizes accept `60` or `60%` (percent), `12c` (fixed rows or columns) and `2fr` (a share of what's left).
+Sizes accept `60` or `60%` (percent), `12c` (fixed rows or columns) and `2fr` (a share of what's left). Every flag is in [`CLI.md`](CLI.md).
 
 ### From a config file (YAML)
 
@@ -101,26 +105,23 @@ The folder `examples/` has ready-made configs, and each one explains itself at t
 | `ssh.yaml` | A template for watching servers (edit the hosts first) |
 
 ```sh
-bin/dozer -c examples/dev.yaml
-bin/dozer --check examples/tree.yaml    # validate + show what would launch, without launching
+dozer -c examples/dev.yaml
+dozer --check examples/tree.yaml    # validate + show what would launch, without launching
 ```
+
+To write your own, start from one of these and read the [configuration guide](CONFIG.md): it walks through a first config step by step, then covers every layout option and key.
 
 ### Saving and sharing a setup
 
-- `--save my.yaml` writes what you launched as an editable YAML file: your work-in-progress copy.
-- `--package my-tool` writes **`my-tool.sh`**, one self-contained script with the config inside. When run, it checks that dozer is installed and pipes its config straight in (`dozer -c -`). No other files are needed, so you can copy it anywhere or send it to anyone who has dozer.
-
 ```sh
-bin/dozer -c examples/dev.yaml --package dev-ws     # → ./dev-ws.sh
-./dev-ws.sh                                         # launch (extra flags pass through)
-./dev-ws.sh --show-config                           # see the config inside
+dozer -l 2,1 -p htop --save my.yaml          # a command line → an editable config file
+cp my.yaml ~/.config/dozer/my.yaml; dozer my # … used as a profile
+dozer -c examples/dev.yaml --package dev-ws  # a config → ./dev-ws.sh, one runnable file
+./dev-ws.sh                                  # launch it (extra flags pass through)
+./dev-ws.sh --show-config                    # see the config inside
 ```
 
-Relative `cwd` paths in a package resolve against the folder you run it from; `~` and `$HOME` resolve for whoever runs it. A package needs `dozer` on your PATH. While testing from the repo, run `DOZER_BIN=$PWD/bin/dozer ./dev-ws.sh`, or copy `bin/dozer` into a folder on your PATH.
-
-A config doesn't need to be a file at all: `dozer -c - < ws.yaml` reads it from stdin, and `dozer --config-text '{"layout":"3"}'` takes YAML or JSON as an argument.
-
-To reuse a config as a **profile**, copy it to `~/.config/dozer/NAME.yaml` and run `dozer NAME`. A `.dozer.yaml` in the current folder, or `~/.config/dozer/config.yaml`, is loaded automatically by a bare `dozer`.
+A `.dozer.yaml` in the current folder, or `~/.config/dozer/config.yaml`, is loaded automatically by a bare `dozer`. [`PACKAGING.md`](PACKAGING.md) covers saving, packages and sharing in full.
 
 ## 4. Scrollback, copying and the mouse
 
@@ -162,6 +163,7 @@ dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has die
 
 ## 6. Expected for now (not bugs)
 
+- **Copying is tmux-style** (copy mode, or a mouse drag), not the OS's own highlight-and-Cmd-C, which can't know about panes. It works; making it feel natural is parked for now (SPEC DP-9).
 - **Copy mode is per pane.** Switching focus leaves a pane in copy mode where it was; `q` there brings it back to live. Restarting a pane clears its history.
 - **Full-screen programs have no history** in dozer (they draw on the alternate screen, like in any terminal). Copy mode then covers what's on screen.
 - **A window that's too small** keeps panes at a minimum size and scrolls the view to the focused pane. The status bar shows `more ◀ ▶` when part of the layout is off-screen.
@@ -183,8 +185,7 @@ dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has die
 Every test is also a ready-to-run script in [`tests/cases/`](../tests/cases/README.md). Each one sets up exactly its scenario and shows its own steps and expected result in pane 1:
 
 ```sh
-make install              # once: dozer on your PATH (default /usr/local/bin; PREFIX=~/.local also works)
 tests/cases/K03-resize.sh
 ```
 
-New in M4: the H (history and copy mode) and M (mouse) cases, plus H04 and M03, which re-test E01 and E05. For anything off, a screenshot plus the terminal app name is the most useful report.
+How to run, record and write cases is in [`TESTING.md`](TESTING.md). For anything off, a screenshot plus the terminal app name is the most useful report.

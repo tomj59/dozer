@@ -1,4 +1,5 @@
 # reference.yaml: every key dozer understands today, with its default.
+# Guide to every key: docs/CONFIG.md.
 # Running it gives the same result as a bare `dozer`.
 #
 #   dozer -c examples/reference.yaml

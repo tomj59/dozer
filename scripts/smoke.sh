@@ -10,7 +10,7 @@ BASE=dozer-smoke-$$
 PKGDIR=$(mktemp -d)
 S=$BASE
 fail=0
-cleanup() { rm -rf "$PKGDIR"; for s in $BASE $BASE-1 $BASE-q $BASE-p $BASE-h $BASE-m; do tmux kill-session -t "$s" 2>/dev/null; done; }
+cleanup() { rm -rf "$PKGDIR"; for s in $BASE $BASE-1 $BASE-q $BASE-p $BASE-h $BASE-m $BASE-r; do tmux kill-session -t "$s" 2>/dev/null; done; }
 trap cleanup EXIT
 
 start() { # session, width, height, dozer args...
@@ -114,6 +114,16 @@ send n
 check "declining keeps dozer" "│ \[1\] "
 quit
 if tmux has-session -t "$S" 2>/dev/null; then bad "C-a q y quits"; else ok "C-a q y quits"; fi
+
+# --- run: panes survive Ctrl-C (they drop to a prompt) -----------------
+S=$BASE-r
+start $S 70 12 -l 1 -p "'sleep 30'"
+send C-c
+sleep 0.5
+send 'echo after-ctrl-c' Enter
+check "run: pane keeps a prompt after Ctrl-C" "^after-ctrl-c"
+if screen | grep -q "✖"; then bad "run: pane not flagged dead after Ctrl-C"; else ok "run: pane not flagged dead after Ctrl-C"; fi
+quit
 
 # --- one pane: sizes reach the child -------------------------------------
 S=$BASE-1

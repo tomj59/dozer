@@ -35,7 +35,8 @@ install: build
 # edit one with ./X.sh --show-config > x.yaml, then dozer -c x.yaml --package X.sh).
 cases: build
 	@for f in tests/cases/*.sh; do \
-		printf '%-40s ' "$$f"; bin/dozer --check -c $$f </dev/null | sed -n 2p || exit 1; \
+		printf '%-40s ' "$$f"; out=$$(bin/dozer --check -c $$f </dev/null) || exit 1; \
+		echo "$$out" | sed -n 2p; \
 	done
 
 clean:

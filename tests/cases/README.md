@@ -11,7 +11,7 @@ tests/cases/K03-resize.sh --show-config   # read it without running
 make cases                        # validate every case
 ```
 
-Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visual). To change a case: `tests/cases/X.sh --show-config > x.yaml`, edit, then `dozer -c x.yaml --package tests/cases/X.sh`. To add one, write a YAML with `name:` and a `description:` (Steps / Expect) and package it.
+Record **PASS / FAIL / PARTIAL** plus notes (terminal app; a screenshot for anything visual) in the tables below. How to run, record, change and write cases is in [`docs/TESTING.md`](../../docs/TESTING.md).
 
 
 ## C: Config & commands
