@@ -63,7 +63,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 | L03 | [Launch sizes: percent, cells, weights](L03-sizes.sh) | M1 | PASS (70/30 height, 30/70 top, 24c + 1fr:2fr bottom measured) · Terminal.app · 2026-09-26 |
 | L04 | [Tree layout: tall left, stacked right](L04-tree.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | L05 | [Maximum: nine panes (3,3,3)](L05-nine-panes.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
-| L06 | [Window too small: minimum size + scrolling view (DP-1)](L06-small-window.sh) | M1 | |
+| L06 | [Window too small: minimum size + scrolling view (DP-1)](L06-small-window.sh) | M1 | PASS (view scrolls to focused pane, "more ◀" shown) · Terminal.app · 2026-09-26 |
 
 ## P: Packaging
 
