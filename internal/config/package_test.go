@@ -84,8 +84,11 @@ func TestPackageNeedsTerminalAndDozer(t *testing.T) {
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 127 || !strings.Contains(string(out), "needs dozer") {
 		t.Errorf("missing dozer: err=%v out=%q", err, out)
 	}
+	// A stand-in dozer that exists everywhere (macOS has no /bin/true).
+	fake := filepath.Join(t.TempDir(), "dozer")
+	os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755)
 	cmd = exec.Command("sh", path) // stdout is a pipe here, not a terminal
-	cmd.Env = append(os.Environ(), "DOZER_BIN=/bin/true")
+	cmd.Env = append(os.Environ(), "DOZER_BIN="+fake)
 	out, _ = cmd.CombinedOutput()
 	if !strings.Contains(string(out), "needs to run in a terminal") {
 		t.Errorf("no-terminal check: %q", out)
