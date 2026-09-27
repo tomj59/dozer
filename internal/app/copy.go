@@ -3,7 +3,10 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
 
+	"github.com/tomj59/dozer/internal/clip"
 	"github.com/tomj59/dozer/internal/input"
 	"github.com/tomj59/dozer/internal/pane"
 )
@@ -147,12 +150,28 @@ func (a *App) copyInput(b []byte) {
 
 func notFound(q string) string { return fmt.Sprintf("%q not found", q) }
 
-// clipboard puts text on the system clipboard through the host terminal
-// (OSC 52), which also works over ssh.
+// clipboard puts text on the system clipboard: through the host terminal
+// (OSC 52, which also works over ssh) and, when dozer runs locally, with
+// the local clipboard command (pbcopy …), because some terminals, notably
+// macOS Terminal.app, ignore OSC 52.
 func (a *App) clipboard(text string) {
 	a.term.SetClipboard(text)
 	n := len([]rune(text))
+	argv := clip.Command(clip.GOOS, os.Getenv, exec.LookPath)
+	if argv == nil {
+		if clip.NoOSC52(os.Getenv) {
+			a.say(fmt.Sprintf("copied %d characters, but this terminal ignores OSC 52 and there's no local clipboard (ssh?)", n))
+		} else {
+			a.say(fmt.Sprintf("copied %d characters", n))
+		}
+		return
+	}
 	a.say(fmt.Sprintf("copied %d characters", n))
+	go func() {
+		if err := clip.Local(argv, text); err != nil {
+			a.post(func() { a.say("clipboard: " + err.Error()) })
+		}
+	}()
 }
 
 // dropPaste removes bracketed-paste content (ESC[200~ … ESC[201~).

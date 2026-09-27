@@ -123,7 +123,7 @@ All of these can be remapped in the config.
   - in a full-screen program that didn't (less, man): sent as ↑/↓ keys (xterm's "alternate scroll");
   - otherwise (a shell): enters copy mode and scrolls back. Scrolling back to the bottom leaves copy mode again.
   The wheel doesn't change focus.
-- **Drag** inside a pane selects text in that pane only (DP-8): the selection stops at the pane's edges, and dragging past its top or bottom scrolls its history. On release it's copied to the clipboard (OSC 52) and a mouse-started copy mode ends.
+- **Drag** inside a pane selects text in that pane only (DP-8): the selection stops at the pane's edges, and dragging past its top or bottom scrolls its history. On release it's copied to the clipboard (§4.5a) and a mouse-started copy mode ends.
 - **Mouse-aware programs:** if the program in a pane turned on mouse reporting (vim with `mouse=a`, htop), presses, releases, drags and the wheel pass through to it, translated to pane coordinates in the encoding it asked for (SGR, or the legacy X10 form). A drag that starts in a pane stays with that pane. Hover (`?1003`) is reported only while the focused program asks for it. **Shift** keeps the event for dozer (Shift-drag selects).
 - **The host terminal's own selection** is still available with its bypass: iTerm2 holds Option; Terminal.app toggles View → Allow Mouse Reporting (⌘R); most Linux terminals hold Shift.
 - `mouse: false` in the config, or `--no-mouse`, leaves the mouse entirely to the terminal (the M3 behavior). Copy mode still works from the keyboard.
@@ -152,7 +152,12 @@ Each pane keeps `scrollback` lines of history (default 10,000). Full-screen prog
 | `Esc` | Drop the selection; again to leave |
 | `q`, `C-c` | Leave |
 
-**Copying** writes the text to the system clipboard with **OSC 52** (DP-8), which works in Terminal.app, iTerm2, kitty, WezTerm, Ghostty and Alacritty, and over ssh. A line the terminal soft-wrapped copies as one line, and trailing blanks are dropped. Copy mode belongs to its pane: switching focus leaves it in place, and restarting the pane ends it.
+**Copying** puts the text on the system clipboard two ways at once (DP-8):
+
+- **OSC 52** through the host terminal. It works over ssh, in iTerm2 (Settings → General → Selection → "Applications in terminal may access clipboard"), kitty, WezTerm, Ghostty, Alacritty, foot and xterm. **macOS Terminal.app ignores it** (found in H02).
+- **The local clipboard command** when dozer runs on your own machine (not over ssh): `pbcopy` on macOS, `wl-copy` on Wayland, `xclip` or `xsel` on X11. This is what makes Terminal.app work.
+
+Over ssh in a terminal without OSC 52 (Terminal.app), there's no way to reach your clipboard; the status bar says so after a copy. A line the terminal soft-wrapped copies as one line, and trailing blanks are dropped. Copy mode belongs to its pane: switching focus leaves it in place, and restarting the pane ends it.
 
 ### 4.6 Status bar and titles
 
@@ -442,7 +447,7 @@ These are designed in from the start, even where v1 uses only one implementation
 | **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
 | **M2 Control** (Linux ✅, Mac pending) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
-| **M4 History & mouse** (Linux ✅, Mac pending: cases H01–H04, M01–M05) | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
+| **M4 History & mouse** (Linux ✅, Mac pending: cases H01–H04, M01–M05) | Scrollback ring, scroll/copy mode with search, clipboard (OSC 52 + local command), **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
 | **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
 | **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
@@ -594,7 +599,7 @@ This is a change inside the emulator (`third_party/vt`: wrap flag on lines, and 
 
 1. **Copy mode** (`C-a [`): keyboard selection within the focused pane, including its scrollback.
 2. **Mouse selection** (M4): dozer takes mouse reporting from the host. Click-drag selects inside the pane under the pointer only, and stops at its edges.
-3. **Clipboard:** a completed selection is written to the system clipboard with **OSC 52**. That works in Terminal.app, iTerm2, kitty, WezTerm, Ghostty and Alacritty, and over ssh. Selections copy *logical* lines (DP-7), so a soft-wrapped line copies as one line.
+3. **Clipboard:** a completed selection is written to the system clipboard with **OSC 52**, and also with the local clipboard command (`pbcopy`, `wl-copy`, `xclip`) when dozer isn't running over ssh, because Terminal.app ignores OSC 52 (§4.5a). Selections copy *logical* lines (DP-7), so a soft-wrapped line copies as one line.
 4. **Escape hatch:** the terminal's own mouse-reporting bypass still gives the host's native selection, for anyone who wants whole rows (iTerm2: Option; Terminal.app: View → Allow Mouse Reporting, ⌘R; most Linux terminals: Shift).
 
 This settles the tradeoff raised earlier: when dozer takes the mouse, host selection needs a modifier. Since host selection is wrong in a multi-pane window anyway, dozer owning selection is the better default. `mouse: false` keeps the host's behavior for anyone who prefers it.
