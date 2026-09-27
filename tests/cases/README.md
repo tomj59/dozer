@@ -45,10 +45,12 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 
 ## H: History & copy mode
 
+> Copy/paste verification (H02, M03, and the selection part of E05) is **parked** until DP-9 is revisited. The features stay in; they just aren't being tested now.
+
 | ID | Case | Milestone | Result |
 |---|---|---|---|
 | H01 | [Scrollback and copy mode (C-a [)](H01-scrollback.sh) | M4 | PASS · Terminal.app · 2026-09-26; note: a trackpad flick locked input until its wheel events drained → fixed in c50eee3 (timer frame limit, wheel coalescing, queued pane input); retest: flick lockup no longer reproduces |
-| H02 | [Copy to the clipboard (v, V, y)](H02-copy-clipboard.sh) | M4 | |
+| H02 | [Copy to the clipboard (v, V, y)](H02-copy-clipboard.sh) | M4 | PARTIAL · Terminal.app · 2026-09-26: V + y copies lines to the clipboard; the rest felt unnatural → **deferred** (DP-9) |
 | H03 | [Search in copy mode (/ ? n N)](H03-search.sh) | M4 | |
 | H04 | [Resize reflow (re-test of E01)](H04-reflow.sh) | M4 | |
 
@@ -80,7 +82,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 |---|---|---|---|
 | M01 | [Mouse: click to focus, drag borders](M01-mouse-focus-resize.sh) | M4 | |
 | M02 | [Mouse wheel](M02-mouse-wheel.sh) | M4 | |
-| M03 | [Mouse selection stays in its pane (re-test of E05)](M03-mouse-select.sh) | M4 | |
+| M03 | [Mouse selection stays in its pane (re-test of E05)](M03-mouse-select.sh) | M4 | **Deferred** (DP-9: copy/paste parked) |
 | M04 | [Mouse in mouse-aware programs](M04-mouse-passthrough.sh) | M4 | |
 | M05 | [mouse: false](M05-mouse-off.sh) | M4 | |
 

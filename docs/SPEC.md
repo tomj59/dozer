@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.16 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.17 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -605,6 +605,20 @@ This is a change inside the emulator (`third_party/vt`: wrap flag on lines, and 
 This settles the tradeoff raised earlier: when dozer takes the mouse, host selection needs a modifier. Since host selection is wrong in a multi-pane window anyway, dozer owning selection is the better default. `mouse: false` keeps the host's behavior for anyone who prefers it.
 
 **Before M4** the workaround was the terminal's rectangular selection (Option-drag in Terminal.app, ⌘⌥-drag in iTerm2) or zooming the pane first. With `mouse: false` that is still the way.
+
+### DP-9 · A natural copy/paste (found in H02)
+
+**Status:** parked (2026-09-26). The M4 features stay in dozer; verification of copy/paste (H02, M03) is paused until this is revisited.
+
+**Finding:** copy mode works (`C-a [`, `V`, `y` put lines on the clipboard; the Terminal.app clipboard needed `pbcopy`, see §4.5a). But it's a tmux/emacs-style workaround: prefix, mode, special selection keys, special copy key. It doesn't feel like the OS's "highlight, then Cmd-C", and it likely won't feel natural to anyone else either. It gives a way to do something that's otherwise hard or impossible, which is a win, but not the win wanted.
+
+**Constraints to remember when this comes back:**
+
+- Cmd-C never reaches a terminal program: the terminal app handles it itself and copies its own selection. dozer can only put text on the clipboard *when it decides to* (on drag release, on `y`).
+- The terminal's own selection can't know about panes (DP-8), so "highlight + Cmd-C" natively will always span panes, except with rectangular selection (Option-drag in Terminal.app) or a zoomed pane.
+- What dozer already offers that's closest to natural: mouse drag inside a pane copies on release (then Cmd-V anywhere). That's M03, not yet verified.
+
+**Options to weigh later:** make drag-to-copy the headline and hide copy mode; `mouse: false` by default so the OS selection behaves as usual (with zoom for clean copies); a one-key "copy this pane's screen" command; per-terminal notes (iTerm2 can be told to let Cmd-C through in some setups).
 
 ## 11. Risks
 
