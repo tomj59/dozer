@@ -20,7 +20,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 |---|---|---|---|
 | C01 | [run: vs exec:](C01-run-vs-exec.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | C02 | [Per-pane cwd and env](C02-cwd-env.sh) | M1 | PASS · Terminal.app · 2026-09-26 (retest on 7a387d4: cwd ~ → /Users/tomj) |
-| C03 | [Panes don't inherit the host terminal's identity](C03-env-isolation.sh) | M2 | Partial: no 'Restored session' seen in D03 · run C03 for the env check |
+| C03 | [Panes don't inherit the host terminal's identity](C03-env-isolation.sh) | M2 | PASS · Terminal.app · 2026-09-26 (7a387d4: TERM_PROGRAM=dozer, no TERM_SESSION_ID/TMUX, no 'Restored session') |
 
 ## D: Dead panes & lifecycle
 
