@@ -85,6 +85,7 @@ func (e *Emulator) handleGrapheme(content string, width int) {
 		// moves cursor down similar to [Terminal.linefeed] except it doesn't
 		// respects [ansi.LNM] mode.
 		// This will reset the phantom state i.e. pending wrap state.
+		e.scr.markWrapped(y) // dozer patch: remember the soft wrap (DP-7)
 		e.index()
 		_, y = e.scr.CursorPosition()
 		x = 0
@@ -120,10 +121,20 @@ func (e *Emulator) handleGrapheme(content string, width int) {
 		e.lastChar, _ = utf8.DecodeRuneInString(content)
 	}
 
+	// dozer patch: a wide glyph that doesn't fit in the last column wraps
+	// first (as in xterm) instead of being cut in half and then overwritten.
+	if awm && cell.Width > 1 && x+cell.Width > e.scr.Width() && x > 0 {
+		e.scr.markWrapped(y)
+		e.index()
+		_, y = e.scr.CursorPosition()
+		x = 0
+	}
+
 	e.scr.SetCell(x, y, &cell)
 
-	// Handle phantom state at the end of the line
-	e.atPhantom = awm && x >= e.scr.Width()-1
+	// Handle phantom state at the end of the line. dozer patch: a wide glyph
+	// ending exactly at the edge also leaves the cursor pending-wrap.
+	e.atPhantom = awm && x+max(cell.Width, 1) >= e.scr.Width()
 	if !e.atPhantom {
 		x += cell.Width
 	}

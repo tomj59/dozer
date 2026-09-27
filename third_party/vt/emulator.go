@@ -81,6 +81,7 @@ func NewEmulator(w, h int) *Emulator {
 	t := new(Emulator)
 	t.scrs[0] = *NewScreen(w, h)
 	t.scrs[1] = *NewScreen(w, h)
+	t.scrs[1].SetScrollback(nil) // dozer patch: alt screen keeps no history
 	t.scr = &t.scrs[0]
 	t.scrs[0].cb = &t.cb
 	t.scrs[1].cb = &t.cb
@@ -213,33 +214,29 @@ func (e *Emulator) CursorPosition() uv.Position {
 }
 
 // Resize resizes the terminal.
+//
+// dozer patch: the main screen reflows its text and scrollback to the new
+// size instead of cropping it (DP-7). The alternate screen belongs to a
+// full-screen app, which redraws on SIGWINCH, so it is simply resized.
 func (e *Emulator) Resize(width int, height int) {
-	x, y := e.scr.CursorPosition()
-	if e.atPhantom {
-		if x < width-1 {
-			e.atPhantom = false
-			x++
-		}
-	}
+	onMain := e.scr == &e.scrs[0]
+	mx, my := e.scrs[0].CursorPosition()
+	nx, ny, nphantom := e.scrs[0].reflow(width, height, mx, my, e.atPhantom && onMain)
+	e.scrs[0].cur.X, e.scrs[0].cur.Y = nx, ny
+	e.scrs[0].saved.X = min(e.scrs[0].saved.X, max(width-1, 0))
+	e.scrs[0].saved.Y = min(e.scrs[0].saved.Y, max(height-1, 0))
 
-	if y < 0 {
-		y = 0
-	}
-	if y >= height {
-		y = height - 1
-	}
-	if x < 0 {
-		x = 0
-	}
-	if x >= width {
-		x = width - 1
-	}
-
-	e.scrs[0].Resize(width, height)
+	ax, ay := e.scrs[1].CursorPosition()
 	e.scrs[1].Resize(width, height)
+	e.scrs[1].cur.X = min(ax, max(width-1, 0))
+	e.scrs[1].cur.Y = min(ay, max(height-1, 0))
 	e.tabstops = uv.DefaultTabStops(width)
 
-	e.setCursor(x, y)
+	if onMain {
+		e.atPhantom = nphantom
+	} else {
+		e.atPhantom = false
+	}
 
 	if e.isModeSet(ansi.ModeInBandResize) {
 		_, _ = io.WriteString(e.pw, ansi.InBandResize(e.Height(), e.Width(), 0, 0))

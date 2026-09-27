@@ -13,6 +13,7 @@ const DefaultScrollbackSize = 10000
 type Scrollback struct {
 	lines    []uv.Line
 	maxLines int
+	pushed   int // dozer patch: total lines ever pushed (see Pushed)
 }
 
 // NewScrollback creates a new scrollback buffer with the given maximum number of lines.
@@ -55,6 +56,7 @@ func (s *Scrollback) Push(line uv.Line) {
 		s.lines = s.lines[1:]
 	}
 	s.lines = append(s.lines, cloned)
+	s.pushed++
 }
 
 // PushN adds n lines from the buffer starting at line y to the scrollback.
@@ -142,5 +144,6 @@ func (s *Scrollback) CellAt(x, y int) *uv.Cell {
 func isBlankCell(c *uv.Cell) bool {
 	return (c.Content == "" || c.Content == " ") && c.Width <= 1 &&
 		c.Style.Fg == nil && c.Style.Bg == nil && c.Style.UnderlineColor == nil &&
-		c.Style.Attrs == 0 && c.Style.Underline == 0 && c.Link.URL == ""
+		c.Style.Attrs == 0 && c.Style.Underline == 0 && c.Link.URL == "" &&
+		!isWrapCell(c)
 }
