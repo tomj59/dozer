@@ -12,6 +12,7 @@ build:
 test:
 	go vet ./...
 	go test ./...
+	cd third_party/vt && go test ./...   # the emulator fork (its own module)
 
 bench:
 	go test ./internal/emu -run x -bench . -benchmem

@@ -10,12 +10,13 @@ BASE=dozer-smoke-$$
 PKGDIR=$(mktemp -d)
 S=$BASE
 fail=0
-cleanup() { rm -rf "$PKGDIR"; for s in $BASE $BASE-1 $BASE-q $BASE-p; do tmux kill-session -t "$s" 2>/dev/null; done; }
+cleanup() { rm -rf "$PKGDIR"; for s in $BASE $BASE-1 $BASE-q $BASE-p $BASE-h $BASE-m; do tmux kill-session -t "$s" 2>/dev/null; done; }
 trap cleanup EXIT
 
 start() { # session, width, height, dozer args...
   local s=$1 w=$2 h=$3; shift 3
   tmux new-session -d -s "$s" -x "$w" -y "$h" "env SHELL=/bin/bash PS1='$ ' bin/dozer -emu $EMU $*"
+  tmux set -g set-clipboard on # accept OSC 52 copies into tmux buffers
   sleep 1.5
 }
 send() { tmux send-keys -t "$S" "$@"; sleep 0.5; }
@@ -145,6 +146,44 @@ send 'exit' Enter
 sleep 0.5
 if tmux has-session -t "$S" 2>/dev/null; then ok "dozer stays when panes exit"; else bad "dozer stays when panes exit"; fi
 check "exited pane flagged" "exited"
+quit
+
+# --- history: reflow, copy mode, clipboard (M4) -----------------------
+S=$BASE-h
+start $S 60 12 -l 1
+send 'printf "%s\n" "alpha-0123456789-beta-0123456789-gamma-0123456789-delta"' Enter
+tmux resize-window -t "$S" -x 30 -y 12; sleep 0.6
+tmux resize-window -t "$S" -x 60 -y 12; sleep 0.6
+check "reflow: shrink then grow restores the line" "^alpha-0123456789-beta-0123456789-gamma-0123456789-delta"
+send 'seq 1 40' Enter
+send C-a '['
+check "copy mode: status and position tag" "COPY \[1\]"
+send k k 0 v '$' y
+if tmux show-buffer 2>/dev/null | grep -qx 39; then ok "copy mode: y copies via OSC 52"; else bad "copy mode: y copies via OSC 52"; tmux show-buffer | head -3; fi
+send C-a '[' '?' 1 7 Enter
+check "copy mode: search moves the view" "^17 "
+send q
+if screen | grep -q "COPY"; then bad "copy mode: q exits"; else ok "copy mode: q exits"; fi
+quit
+
+# --- mouse (M4): events typed as raw SGR reports ------------------------
+S=$BASE-m
+start $S 80 16 -l 2
+mouse() { tmux send-keys -t "$S" -l "$(printf '\033[<%s' "$1")"; sleep 0.3; }
+send 'seq 1 50' Enter
+mouse '0;60;5M'; mouse '0;60;5m'
+check "mouse: click focuses the pane" "│ \[2\] bash"
+before=$(border)
+mouse '0;41;8M'; mouse '32;37;8M'; mouse '0;37;8m'
+after=$(border)
+if [ "$after" -eq $((before - 4)) ]; then ok "mouse: dragging a divider resizes"; else bad "mouse: divider drag $before → $after, want -4"; fi
+mouse '64;10;8M'
+check "mouse: wheel scrolls history" "\[3/"
+mouse '65;10;8M'
+if screen | grep -q "\[0/\|\[3/"; then bad "mouse: wheel back down returns to live"; else ok "mouse: wheel back down returns to live"; fi
+mouse '0;1;3M'; mouse '32;2;4M'; mouse '0;2;4m'
+sleep 0.3
+if [ "$( (tmux show-buffer 2>/dev/null; echo) | grep -Ec '^[0-9]+$')" = 2 ]; then ok "mouse: drag selects and copies"; else bad "mouse: drag selects and copies"; tmux list-buffers; fi
 quit
 
 # --- packaged workspace: config piped on stdin, keyboard from the tty ----

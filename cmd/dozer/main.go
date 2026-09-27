@@ -74,6 +74,7 @@ func main() {
 		widths    strList
 		prefix    = flag.String("prefix", "", "prefix key, e.g. C-b (default C-a)")
 		quitAll   = flag.Bool("quit-when-all-exited", false, "quit once every pane has exited (default: stay, showing dead panes)")
+		noMouse   = flag.Bool("no-mouse", false, "leave the mouse to the terminal (no click focus, wheel scrollback or pane-aware selection)")
 		check     = flag.Bool("check", false, "validate and print the resolved configuration, then exit")
 		save      = flag.String("save", "", "write the resolved configuration as YAML to `file` (- = stdout), then exit")
 		pkg       = flag.String("package", "", "write a self-contained, runnable `script` (NAME.sh) with the configuration inside, then exit")
@@ -99,6 +100,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dozer:", err)
 		os.Exit(2)
+	}
+	if *noMouse {
+		cfg.Mouse = false
 	}
 	if *check {
 		fmt.Print(cfg.Describe())

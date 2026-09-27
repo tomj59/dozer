@@ -13,32 +13,33 @@ type Key struct {
 func Keys(b []byte) []Key {
 	var out []Key
 	for len(b) > 0 {
-		c := b[0]
-		switch {
-		case c == 0x1b:
-			k, n := escape(b)
-			if k.Name != "" || k.Rune != 0 {
-				out = append(out, k)
-			}
-			b = b[n:]
-			continue
-		case c == '\r' || c == '\n':
-			out = append(out, Key{Name: "enter"})
-		case c == 0x7f || c == 0x08:
-			out = append(out, Key{Name: "backspace"})
-		case c == '\t':
-			out = append(out, Key{Name: "tab"})
-		case c < 0x20:
-			out = append(out, Key{Rune: rune(c)})
-		default:
-			r, n := utf8.DecodeRune(b)
-			out = append(out, Key{Rune: r})
-			b = b[n:]
-			continue
+		k, n := NextKey(b)
+		if k != (Key{}) {
+			out = append(out, k)
 		}
-		b = b[1:]
+		b = b[n:]
 	}
 	return out
+}
+
+// NextKey decodes the key at the start of b and how many bytes it used. An
+// unknown escape sequence gives the zero Key.
+func NextKey(b []byte) (Key, int) {
+	c := b[0]
+	switch {
+	case c == 0x1b:
+		return escape(b)
+	case c == '\r' || c == '\n':
+		return Key{Name: "enter"}, 1
+	case c == 0x7f || c == 0x08:
+		return Key{Name: "backspace"}, 1
+	case c == '\t':
+		return Key{Name: "tab"}, 1
+	case c < 0x20:
+		return Key{Rune: rune(c)}, 1
+	}
+	r, n := utf8.DecodeRune(b)
+	return Key{Rune: r}, n
 }
 
 // escape decodes an escape sequence at the start of b.

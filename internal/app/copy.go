@@ -19,7 +19,9 @@ func (a *App) enterCopy() {
 // (main loop). Keys follow vi, as in tmux's copy mode (docs/SPEC.md §4.4).
 func (a *App) copyInput(b []byte) {
 	p := a.focused()
-	for _, k := range input.Keys(b) {
+	for len(b) > 0 {
+		k, n := input.NextKey(b)
+		b = b[n:]
 		var searchPrompt string
 		var copied string
 		p.WithCopy(func(c *pane.CopyMode, src pane.Source) bool {
@@ -133,7 +135,10 @@ func (a *App) copyInput(b []byte) {
 					return false
 				})
 			})
-			return // the rest of this input belongs to the prompt
+			if len(b) > 0 { // typed ahead: the rest belongs to the prompt
+				a.modalInput(b)
+			}
+			return
 		}
 	}
 }

@@ -94,7 +94,9 @@ func Run(cfg *config.Config, o Options) (err error) {
 		// pane can print $DOZER_DESCRIPTION).
 		spec.Env = append(append([]string(nil), spec.Env...),
 			"DOZER_NAME="+cfg.Name, "DOZER_DESCRIPTION="+cfg.Description)
-		a.panes = append(a.panes, pane.New(i+1, spec, o.Emulator, 80, 24, a.mark))
+		p := pane.New(i+1, spec, o.Emulator, 80, 24, a.mark)
+		p.SetScrollback(cfg.Scrollback)
+		a.panes = append(a.panes, p)
 	}
 	defer func() {
 		for _, p := range a.panes {
