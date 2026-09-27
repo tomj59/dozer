@@ -51,6 +51,10 @@ Several shells in one terminal. Prefix key Ctrl-a, then:
   H J K L   move the focused pane's border (repeatable)   =  reset sizes
   r   restart focused pane   R   restart every dead pane   x  kill focused pane
   t   rename pane   s   toggle status bar   C-l redraw   q quit   Esc cancel
+  [   copy mode: scroll back, v/V select, y copy, / ? search, q leave
+
+Mouse: click to focus, drag a border to resize, wheel to scroll back,
+drag to select and copy within a pane (--no-mouse leaves it to the terminal).
 
 Examples:
   dozer                          default 2,1 layout, your shell in every pane

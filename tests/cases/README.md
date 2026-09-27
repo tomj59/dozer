@@ -37,11 +37,20 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 
 | ID | Case | Milestone | Result |
 |---|---|---|---|
-| E01 | [Colors and Unicode](E01-color-unicode.sh) | M0 | PARTIAL · Terminal.app · 2026-09-26: colors, styles, Unicode pass; shrink then grow loses cropped output → DP-7 (reflow, M4) |
+| E01 | [Colors and Unicode](E01-color-unicode.sh) | M0 | PARTIAL · Terminal.app · 2026-09-26: colors, styles, Unicode pass; shrink then grow loses cropped output → DP-7 (reflow, M4); re-test with H04 |
 | E02 | [Full-screen programs side by side](E02-fullscreen-apps.sh) | M0 | PASS · Terminal.app · 2026-09-26 (top, less, vim side by side) |
 | E03 | [Heavy output in several panes](E03-flood.sh) | M0 | PASS · Terminal.app · 2026-09-26 (3 × 1M lines concurrently, ~2.9 s each) |
 | E04 | [Shell line editing and history](E04-line-editing.sh) | M0 | PASS · Terminal.app · 2026-09-26 |
-| E05 | [Bracketed paste and Option/Meta keys](E05-paste-and-meta.sh) | M0 | PARTIAL · Terminal.app · 2026-09-26: bracketed paste OK (indent kept), Option-b/f OK; mouse selection spans panes → DP-8 (M4) |
+| E05 | [Bracketed paste and Option/Meta keys](E05-paste-and-meta.sh) | M0 | PARTIAL · Terminal.app · 2026-09-26: bracketed paste OK (indent kept), Option-b/f OK; mouse selection spans panes → DP-8 (M4); re-test with M03 |
+
+## H: History & copy mode
+
+| ID | Case | Milestone | Result |
+|---|---|---|---|
+| H01 | [Scrollback and copy mode (C-a [)](H01-scrollback.sh) | M4 | |
+| H02 | [Copy to the clipboard (v, V, y)](H02-copy-clipboard.sh) | M4 | |
+| H03 | [Search in copy mode (/ ? n N)](H03-search.sh) | M4 | |
+| H04 | [Resize reflow (re-test of E01)](H04-reflow.sh) | M4 | |
 
 ## K: Keys & controls
 
@@ -64,6 +73,16 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 | L04 | [Tree layout: tall left, stacked right](L04-tree.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | L05 | [Maximum: nine panes (3,3,3)](L05-nine-panes.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | L06 | [Window too small: minimum size + scrolling view (DP-1)](L06-small-window.sh) | M1 | PASS (view scrolls to focused pane, "more ◀" shown) · Terminal.app · 2026-09-26 |
+
+## M: Mouse
+
+| ID | Case | Milestone | Result |
+|---|---|---|---|
+| M01 | [Mouse: click to focus, drag borders](M01-mouse-focus-resize.sh) | M4 | |
+| M02 | [Mouse wheel](M02-mouse-wheel.sh) | M4 | |
+| M03 | [Mouse selection stays in its pane (re-test of E05)](M03-mouse-select.sh) | M4 | |
+| M04 | [Mouse in mouse-aware programs](M04-mouse-passthrough.sh) | M4 | |
+| M05 | [mouse: false](M05-mouse-off.sh) | M4 | |
 
 ## P: Packaging
 

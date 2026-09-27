@@ -1,6 +1,6 @@
 # dozer quickstart
 
-This page teaches you to use dozer as it exists today (M2: multiple panes with runtime controls). When you've finished it, [`M2-CHECKLIST.md`](M2-CHECKLIST.md) is where you record whether it works. ([`M1-CHECKLIST.md`](M1-CHECKLIST.md) covers the basics, if you haven't done it.)
+This page teaches you to use dozer as it exists today (M4: multiple panes with runtime controls, scrollback, copy mode and the mouse). When you've finished it, the test cases in [`tests/cases/`](../tests/cases/README.md) are where you check that it works (§8).
 
 ## What you're looking at
 
@@ -49,6 +49,7 @@ Every shell needs every normal keystroke, so dozer reserves exactly one key, **`
 | `z` | **Zoom**: the focused pane fills the window. `Ctrl-a z` again restores the layout. |
 | `H` `J` `K` `L` | **Resize**: move the focused pane's border left, down, up or right. Keep pressing the letter (no prefix needed) while the status bar says **RESIZE**. |
 | `=` | Reset all sizes to how the layout launched |
+| `[` | **Copy mode**: scroll back through the pane's history, select and copy (§4) |
 | `t` | Rename the focused pane (type, then Enter; Esc cancels; empty restores the default) |
 | `s` | Hide or show the status bar |
 | `x` | Kill the focused pane's process (asks first). The pane stays, dead, until you restart it. |
@@ -121,7 +122,33 @@ A config doesn't need to be a file at all: `dozer -c - < ws.yaml` reads it from 
 
 To reuse a config as a **profile**, copy it to `~/.config/dozer/NAME.yaml` and run `dozer NAME`. A `.dozer.yaml` in the current folder, or `~/.config/dozer/config.yaml`, is loaded automatically by a bare `dozer`.
 
-## 4. When a pane's process ends
+## 4. Scrollback, copying and the mouse
+
+Every pane keeps its history (10,000 lines by default; `scrollback:` in a config changes it).
+
+**With the mouse** (on by default):
+
+- **Click** a pane to focus it. **Drag** a divider or a title line to resize.
+- **Wheel** over a shell to scroll back through its history; wheel back down to the bottom to return. Over `less` or `man` the wheel scrolls the page; programs that use the mouse themselves (vim with `mouse=a`, htop) get it directly.
+- **Drag** inside a pane to select. The selection stays inside that pane, even if you drag across its border, and it's copied to your clipboard when you let go. Paste as usual (Cmd-V).
+- Want your terminal's own selection back for a moment? iTerm2: hold Option. Terminal.app: View → Allow Mouse Reporting (⌘R) toggles it. Or start dozer with `--no-mouse` (or `mouse: false` in a config).
+
+**With the keyboard**, `Ctrl-a [` opens **copy mode** on the focused pane. The status bar says `COPY`, and a tag like `[120/3000]` shows how far back you are. The program keeps running; the view just holds still.
+
+| Keys | |
+|---|---|
+| `↑↓←→` / `h j k l` | move |
+| `Ctrl-u` `Ctrl-d` · `PgUp` `PgDn` | half page / page |
+| `g` / `G` | oldest line / back to the live screen |
+| `w` `b` `e` · `0` `$` | words · line start and end |
+| `v` / `V` | select characters / whole lines |
+| `y` or `Enter` | copy to the clipboard and leave |
+| `/` `?` + text, `n` `N` | search down / up, next / previous (lower case ignores case) |
+| `q` or `Esc` | leave |
+
+A line that wrapped on screen copies as one line. If you make the window narrower and then wider again, text rewraps and comes back intact.
+
+## 5. When a pane's process ends
 
 A pane is a **permanent slot**. When its process exits or crashes, the layout does *not* change. Instead the pane is flagged:
 
@@ -133,17 +160,16 @@ A pane is a **permanent slot**. When its process exits or crashes, the layout do
 
 dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has died. (`--quit-when-all-exited` changes that.)
 
-## 5. Expected for now (not bugs)
+## 6. Expected for now (not bugs)
 
-- **No mouse yet.** Clicking doesn't focus panes and apps like htop don't receive clicks until M4. Your terminal's own text selection still works.
-- **Copying text with the mouse spans panes.** Your terminal's selection doesn't know about panes, so it grabs whole rows, neighbors and dividers included. For now, zoom the pane first (`Ctrl-a z`), or use rectangular selection: ⌥ Option-drag in Terminal.app, ⌘⌥-drag in iTerm2. Pane-aware copy comes in M4 (DP-8).
-- **No scrollback.** Output that scrolls off the top of a pane is gone for now (M4). The scroll wheel may cycle shell history instead.
+- **Copy mode is per pane.** Switching focus leaves a pane in copy mode where it was; `q` there brings it back to live. Restarting a pane clears its history.
+- **Full-screen programs have no history** in dozer (they draw on the alternate screen, like in any terminal). Copy mode then covers what's on screen.
 - **A window that's too small** keeps panes at a minimum size and scrolls the view to the focused pane. The status bar shows `more ◀ ▶` when part of the layout is off-screen.
 - **Option key as Meta** depends on your terminal setting, just as without dozer:
   - Terminal.app: Settings → Profiles → Keyboard → "Use Option as Meta key"
   - iTerm2: Profiles → Keys → Left Option key: Esc+
 
-## 6. If something goes wrong
+## 7. If something goes wrong
 
 | Symptom | Try |
 |---|---|
@@ -152,7 +178,7 @@ dozer itself only quits when you say so (`Ctrl-a q`), even if every pane has die
 | dozer is stuck | From another terminal: `pkill dozer` |
 | Your terminal is weird after dozer exits | Type `reset` + Enter, and please report it: that's a bug |
 
-## 7. Now test it
+## 8. Now test it
 
 Every test is also a ready-to-run script in [`tests/cases/`](../tests/cases/README.md). Each one sets up exactly its scenario and shows its own steps and expected result in pane 1:
 
@@ -161,5 +187,4 @@ make install              # once: dozer on your PATH (default /usr/local/bin; PR
 tests/cases/K03-resize.sh
 ```
 
-
-Work through [`M1-CHECKLIST.md`](M1-CHECKLIST.md). For anything off, a screenshot plus the terminal app name is the most useful report.
+New in M4: the H (history and copy mode) and M (mouse) cases, plus H04 and M03, which re-test E01 and E05. For anything off, a screenshot plus the terminal app name is the most useful report.

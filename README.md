@@ -2,7 +2,7 @@
 
 A TUI multi-shell for Linux and macOS: one terminal window holding several live shells in a row/column layout, each set up at launch by flags, piped commands or a YAML file.
 
-> **Status: M2.** Multiple panes in rows/columns, focus, zoom, runtime resize, dead-pane handling, YAML configs, `--save` and `--package`. See [`docs/SPEC.md`](docs/SPEC.md) for the design and roadmap.
+> **Status: M4.** Multiple panes in rows/columns, focus, zoom, runtime resize, dead-pane handling, YAML configs, `--save` and `--package`; per-pane scrollback with copy mode, search and clipboard copy (OSC 52); text that rewraps on resize; and the mouse (click focus, border drag, wheel, pane-confined selection). See [`docs/SPEC.md`](docs/SPEC.md) for the design and roadmap.
 
 **New here? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md).**
 

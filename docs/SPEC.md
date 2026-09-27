@@ -1,6 +1,6 @@
 # dozer — TUI Multi Shell · Specification
 
-Status: Draft v0.15 · Owner: Tom · Last updated: 2026-09-26
+Status: Draft v0.16 · Owner: Tom · Last updated: 2026-09-26
 
 ## 1. Summary
 
@@ -94,7 +94,7 @@ Per-pane options: `title`, `cwd`, `env`, `restart: never|on-failure|always` (exe
 | `C-a H J K L` | Move the focused pane's border left/down/up/right (tmux-style: the border on that side, or the opposite one at an edge). 2 columns / 1 row per press. Repeatable without the prefix for 0.7 s (status: RESIZE). Existing splits only. |
 | `C-a =` | Reset split sizes to the launch layout |
 | `C-a z` | Zoom or unzoom the focused pane |
-| `C-a [` | Scroll/copy mode (vi keys, `/` search, `q` exits) |
+| `C-a [` | Scroll/copy mode: history of the focused pane with vi keys, selection, search and copy (§4.5a) |
 | `C-a m` | Enter multi-input mode for the focused pane's group |
 | `C-a M` | Enter multi-input mode for all panes |
 | `C-a Esc` | Leave multi-input mode |
@@ -113,14 +113,46 @@ All of these can be remapped in the config.
 
 ### 4.5 Mouse
 
-> **Status (M1):** not implemented. With several panes, raw mouse reports must be translated to the pane under the pointer, so host mouse mirroring is switched off until M4. Terminal text selection works normally in the meantime.
+> **Status (M4):** implemented. dozer turns on button and drag reporting (SGR, `?1002` + `?1006`) on the host and routes each event by what's under the pointer, through the viewport→canvas transform (DP-1).
 
+- **Click** a pane to focus it. A click does nothing else (it is not passed to a shell).
+- **Drag** a vertical divider or a pane's title line (the border above it) to resize. Same rules as `C-a H J K L`: minimum sizes hold, and sizes become weights that survive window resizes.
+- **Wheel** over a pane:
+  - in copy mode: scrolls the history 3 lines per notch;
+  - in a program that turned on mouse reporting: passed to it;
+  - in a full-screen program that didn't (less, man): sent as ↑/↓ keys (xterm's "alternate scroll");
+  - otherwise (a shell): enters copy mode and scrolls back. Scrolling back to the bottom leaves copy mode again.
+  The wheel doesn't change focus.
+- **Drag** inside a pane selects text in that pane only (DP-8): the selection stops at the pane's edges, and dragging past its top or bottom scrolls its history. On release it's copied to the clipboard (OSC 52) and a mouse-started copy mode ends.
+- **Mouse-aware programs:** if the program in a pane turned on mouse reporting (vim with `mouse=a`, htop), presses, releases, drags and the wheel pass through to it, translated to pane coordinates in the encoding it asked for (SGR, or the legacy X10 form). A drag that starts in a pane stays with that pane. Hover (`?1003`) is reported only while the focused program asks for it. **Shift** keeps the event for dozer (Shift-drag selects).
+- **The host terminal's own selection** is still available with its bypass: iTerm2 holds Option; Terminal.app toggles View → Allow Mouse Reporting (⌘R); most Linux terminals hold Shift.
+- `mouse: false` in the config, or `--no-mouse`, leaves the mouse entirely to the terminal (the M3 behavior). Copy mode still works from the keyboard.
 
-- Click a pane to focus it.
-- Drag a border to resize.
-- Scroll the wheel to enter scrollback.
-- If the program in a pane has turned on mouse reporting (vim, htop), mouse events inside that pane pass through to it instead. `Shift` forces dozer to handle the event.
-- Mouse support can be turned off entirely: `mouse: false`.
+### 4.5a Scrollback and copy mode
+
+> **Status (M4):** implemented.
+
+Each pane keeps `scrollback` lines of history (default 10,000). Full-screen programs on the alternate screen have none: copy mode then covers just the visible screen.
+
+`C-a [` (or the mouse wheel) opens **copy mode** on the focused pane. The pane stops following output and shows its history; a `[lines back/history]` tag sits in its top right corner, and the status bar says `COPY`. The program keeps running and output keeps arriving: the view holds its place and doesn't jump.
+
+| Keys | Action |
+|---|---|
+| `h j k l`, arrows | Move the cursor |
+| `C-u` `C-d` / `C-b` `C-f`, `PgUp` `PgDn` | Half page / page up and down |
+| `C-y` `C-e` | Scroll one line (cursor stays on its row) |
+| `g` / `G`, `Home` / `End` | Oldest line / the live screen |
+| `H` `M` `L` | Top, middle, bottom of the view |
+| `0` `^` `$` | Line start, first non-blank, line end |
+| `w` `b` `e` | Next word, previous word, end of word |
+| `v` (or `Space`) / `V` | Start or stop a character / line selection |
+| `y`, `Enter` | Copy the selection to the clipboard and leave |
+| `/` `?` then text | Search down / up. Lower case ignores case; any capital makes it exact ("smart case"). |
+| `n` / `N` | Repeat the search / in the other direction. Searches wrap around. |
+| `Esc` | Drop the selection; again to leave |
+| `q`, `C-c` | Leave |
+
+**Copying** writes the text to the system clipboard with **OSC 52** (DP-8), which works in Terminal.app, iTerm2, kitty, WezTerm, Ghostty and Alacritty, and over ssh. A line the terminal soft-wrapped copies as one line, and trailing blanks are dropped. Copy mode belongs to its pane: switching focus leaves it in place, and restarting the pane ends it.
 
 ### 4.6 Status bar and titles
 
@@ -137,7 +169,7 @@ dozer has an explicit input-mode state machine. Only one mode is active at a tim
 | **Normal** | Focused pane only | (default) | — |
 | **Prefix** | dozer command table (a single key) | `C-a` | Automatically, after one key or a timeout |
 | **Multi-input** | Every non-readonly pane in the target set (a group, or all panes) | `C-a m` / `C-a M` | `C-a Esc` only. There's no timeout and no automatic exit. |
-| **Scroll/copy** | Scrollback navigation for the focused pane | `C-a [` | `q` / `Esc` |
+| **Scroll/copy** | History navigation, selection and search in the focused pane (§4.5a) | `C-a [`, mouse wheel or drag | `q`, `Esc`, `y`, or scrolling back to the bottom (mouse) |
 
 Multi-input rules:
 
@@ -291,7 +323,7 @@ cwd: ~/work                # default: current directory
 env: { STAGE: prod }
 prefix: C-a
 mouse: true
-scrollback: 10000          # lines per pane
+scrollback: 10000          # history lines per pane (0 to 1,000,000)
 status_bar: bottom         # top | bottom | off
 
 # Shorthand form:
@@ -327,13 +359,13 @@ Validation errors are reported with the line number. `dozer --check <file>` vali
 
 **Implemented so far (M1):**
 
-- Top-level keys: `version`, `name`, `description` (free text: shown by `--check`, in package headers, and to every pane as `$DOZER_DESCRIPTION`), `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths` (sizes also accept `auto`), `panes` (list or named map), `min_pane`, `quit_when_all_exited`, `status_bar` (M2).
+- Top-level keys: `version`, `name`, `description` (free text: shown by `--check`, in package headers, and to every pane as `$DOZER_DESCRIPTION`), `shell`, `cwd`, `env`, `prefix`, `layout` (shorthand or tree), `heights`, `widths` (sizes also accept `auto`), `panes` (list or named map), `min_pane`, `quit_when_all_exited`, `status_bar` (M2), `mouse`, `scrollback` (M4).
 - Pane keys: `title`, `run`, `exec`, `cwd`, `env`, `shell`, `restart`.
 - A bare string in the pane list is shorthand for `run:`.
 
 Keys from later milestones are accepted but produce a warning in `--check` (they're ignored for now):
 
-- top level: `mouse`, `scrollback`, `multi_input`, `keys`
+- top level: `multi_input`, `keys`
 - pane: `readonly`, `group`, `min`
 
 Unknown keys are errors. Working examples ship in `examples/`, and every one is loaded by the test suite.
@@ -410,7 +442,7 @@ These are designed in from the start, even where v1 uses only one implementation
 | **M1 Layouts** (Linux ✅, Mac pending) | Layout tree and solver, `default` and `2,2,1` presets, `-l`, `--heights`/`--widths`, `-p`/`-x` (repeatable), piped input, thin dividers with titles. **Pulled forward:** focus (arrows/hjkl/1-9/o), zoom, quit confirm, dead panes with `C-a r`/`R` (from M2); the YAML config subset, profiles and `--check` (from M3); `examples/`. DP-1 viewport, auto-follow only. |
 | **M2 Control** (Linux ✅, Mac pending) | Prefix FSM, focus, zoom, keyboard resize, quit (with confirm), kill, restart. Dead-pane states, chrome, banner and status count (§4.10); `C-a r`/`C-a R`; `quit_when_all_exited`. |
 | **M3 Config** | YAML schema, profiles, `--check`, `run`/`exec`, per-pane options, titles, status bar. |
-| **M4 History & mouse** | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
+| **M4 History & mouse** (Linux ✅, Mac pending: cases H01–H04, M01–M05) | Scrollback ring, scroll/copy mode with search, OSC 52 clipboard, **resize reflow (DP-7)**, **pane-confined selection (DP-8)**, mouse focus/resize/scroll and passthrough. |
 | **M5 Multi-input** | Input-mode state machine, groups, one-time warning plus its suppress flag, visual indicators, readonly panes. |
 | **M3 (add-on)** ✅ (done in M2) | `--save` stub: resolve the launch inputs into canonical YAML (§4.9). It shares the YAML serializer with `--check`. |
 | **M3 (add-on)** ✅ | `--package NAME`: packaged workspace scripts (§4.12). |
@@ -489,7 +521,7 @@ Small patches (about 50 lines; three for speed, one for a data race, recorded in
 **Watch items:**
 
 - Throughput is still about 2× behind vt10x. The remaining cost is per scroll: blank-filling the new line, trimming the scrolled-off line, and marking lines as changed. A deeper fix (lazily created blank lines, a compact scrollback) can come later if real use needs it.
-- Scrollback memory: every cell is about 112 bytes, so scrollback is sized by content, not pane width. Still, 10,000 lines of wide colored output per pane can reach tens of MB. Revisit with the M4 scrollback work.
+- Scrollback memory: every cell is about 112 bytes, so scrollback is sized by content, not pane width. Still, 10,000 lines of wide colored output per pane can reach tens of MB. M4 keeps scrollback lines trimmed to their content and lets `scrollback:` lower the limit per workspace; a compact line format stays possible if real use needs it.
 - ultraviolet and x/vt are pre-1.0 (pseudo-versions), so API churn is possible. The adapter layer contains it.
 - **Found in Mac testing (fixed):** the host cursor lagged one keystroke behind the shell's, which made line editing drift and scramble. The cause is in `uv.TerminalScreen.Flush`: it queues the cursor move *after* writing out the frame, so each move went out one frame late. dozer now drives `uv.TerminalRenderer` directly (`internal/host`), and `scripts/smoke.sh` checks the cursor after each edit. Report upstream.
 
@@ -530,7 +562,7 @@ A version pin is also worth considering: the script records the dozer version th
 
 ### DP-7 · Resize reflow (found in E01)
 
-**Status:** decided; build it with scrollback in M4.
+**Status:** built in M4 (fork patches 5–7, `third_party/vt/DOZER_PATCHES.md`). Mac re-test: H04.
 
 **Symptom:** after shrinking the window, output that was cut off at the new width doesn't come back when the window grows again. It isn't a limit of the host terminal. Terminal.app, iTerm2, kitty and tmux all rewrap text on resize. The cause is in dozer: the emulator truncates each line to the new width and throws the cut-off cells away, and it doesn't record which lines were soft-wrapped, so it can't rejoin them. Full-screen programs (vim, top) aren't affected because they redraw themselves on resize. The loss hits shell output and the guide panes.
 
@@ -543,11 +575,18 @@ A version pin is also worth considering: the script records the dozer version th
 
 This is a change inside the emulator (`third_party/vt`: wrap flag on lines, and reflow in `Screen.Resize` plus `Scrollback`), with no change to the adapter interface. Doing it together with M4 avoids building the scrollback storage twice.
 
+**As built:**
+
+- The wrap flag is a marker on the wrapped line's last cell, so every existing line operation (scroll, insert/delete line, erase, scrollback push) carries or clears it with no extra bookkeeping. It's stripped before cells are drawn.
+- A resize also moves rows that no longer fit into scrollback (and brings them back when the pane grows) instead of cutting them off the bottom.
+- Wide glyphs that don't fit in the last column now wrap first, as in xterm; before, they were cut in half and overwritten.
+- Cost: lines that still fit in one row are reused without copying. A full 10,000-line scrollback of short lines reflows in about 3 ms; of lines that all rewrap, about 60 ms.
+
 **Alternative rejected:** keeping each line's cut-off tail and pasting it back on grow. It's cheap, but it goes wrong as soon as the program writes to those rows at the narrower width, and it doesn't rewrap anything.
 
 ### DP-8 · Who owns text selection (found in E05)
 
-**Status:** decided; build it in M4 with copy mode and the mouse.
+**Status:** built in M4 (§4.5, §4.5a). Mac re-test: M03.
 
 **Symptom:** selecting text with the host terminal's mouse runs across pane boundaries. A selection covers whole rows of the dozer window, including the neighboring pane and the `│` divider, and copying or pasting it carries all of that along. This can't be fixed from inside dozer while the host terminal does the selecting: the host sees one grid of text and knows nothing about panes. tmux and screen have the same limit. (Bracketed paste itself worked: indentation arrived intact.)
 
@@ -556,15 +595,11 @@ This is a change inside the emulator (`third_party/vt`: wrap flag on lines, and 
 1. **Copy mode** (`C-a [`): keyboard selection within the focused pane, including its scrollback.
 2. **Mouse selection** (M4): dozer takes mouse reporting from the host. Click-drag selects inside the pane under the pointer only, and stops at its edges.
 3. **Clipboard:** a completed selection is written to the system clipboard with **OSC 52**. That works in Terminal.app, iTerm2, kitty, WezTerm, Ghostty and Alacritty, and over ssh. Selections copy *logical* lines (DP-7), so a soft-wrapped line copies as one line.
-4. **Escape hatch:** holding the terminal's override modifier (Shift in most terminals, Option or Fn in some) still gives the host's native selection, for anyone who wants whole rows.
+4. **Escape hatch:** the terminal's own mouse-reporting bypass still gives the host's native selection, for anyone who wants whole rows (iTerm2: Option; Terminal.app: View → Allow Mouse Reporting, ⌘R; most Linux terminals: Shift).
 
 This settles the tradeoff raised earlier: when dozer takes the mouse, host selection needs a modifier. Since host selection is wrong in a multi-pane window anyway, dozer owning selection is the better default. `mouse: false` keeps the host's behavior for anyone who prefers it.
 
-**Interim workaround (until M4):** use the terminal's rectangular selection to stay within a pane:
-- Terminal.app: hold ⌥ Option while dragging.
-- iTerm2: hold ⌘ + ⌥ while dragging.
-
-Or zoom the pane first (`C-a z`).
+**Before M4** the workaround was the terminal's rectangular selection (Option-drag in Terminal.app, ⌘⌥-drag in iTerm2) or zooming the pane first. With `mouse: false` that is still the way.
 
 ## 11. Risks
 
