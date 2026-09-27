@@ -2,6 +2,8 @@
 
 Each case is a **packaged dozer workspace**: one self-contained script that sets up exactly what the test needs. A **guide** pane (pane 1) shows the steps and the expected result. If the text is taller than the pane, it opens in `less`; scroll, then `q` leaves it on screen.
 
+> **After pulling changes, run `make install`, not just `make`.** The cases run the `dozer` on your PATH; plain `make` only rebuilds `bin/dozer`. The status bar shows the version (commit) actually running.
+
 ```sh
 make install                      # once: puts dozer on your PATH (or: export DOZER_BIN=$PWD/bin/dozer)
 tests/cases/K03-resize.sh         # run one case
@@ -17,7 +19,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 | ID | Case | Milestone | Result |
 |---|---|---|---|
 | C01 | [run: vs exec:](C01-run-vs-exec.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
-| C02 | [Per-pane cwd and env](C02-cwd-env.sh) | M1 | |
+| C02 | [Per-pane cwd and env](C02-cwd-env.sh) | M1 | FAIL → fixed · Terminal.app · 2026-09-26: cwd: ~ was ignored (bare ~ is YAML null); retest |
 | C03 | [Panes don't inherit the host terminal's identity](C03-env-isolation.sh) | M2 | Partial: no 'Restored session' seen in D03 · run C03 for the env check |
 
 ## D: Dead panes & lifecycle
@@ -27,7 +29,7 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 | D01 | [Dead-pane states and chrome](D01-dead-states.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | D02 | [Restoring dead panes (r / R)](D02-restore.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | D03 | [Automatic restart: back-off and the retry limit](D03-auto-restart.sh) | M2 | PASS · Terminal.app · 2026-09-26 (back-off + retry limit) |
-| D04 | [Kill a pane (x)](D04-kill.sh) | M2 | PASS · Terminal.app · 2026-09-26 (title then read 'exit 1'; now 'killed (exit 1)') |
+| D04 | [Kill a pane (x)](D04-kill.sh) | M2 | PASS · Terminal.app · 2026-09-26 (recheck: 'killed (exit 1)' on cf4b826) |
 | D05 | [quit_when_all_exited: true](D05-quit-when-all-exited.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 | D06 | [Quit confirmation](D06-quit-confirm.sh) | M1 | PASS · Terminal.app · 2026-09-26 |
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# C03-env-isolation: a dozer workspace, packaged by dozer 8471ae2-dirty on 2026-09-26.
+# C03-env-isolation: a dozer workspace, packaged by dozer dc640fc-dirty on 2026-09-26.
 # Self-contained: the configuration is inside this script and is piped
 # straight to dozer (dozer -c -). Nothing else is read or written.
 #

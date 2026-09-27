@@ -39,7 +39,7 @@ func (c *Config) YAML(header string) ([]byte, error) {
 	add := func(key string, v *yaml.Node) {
 		doc.Content = append(doc.Content, str(key), v)
 	}
-	add("version", str("1"))
+	add("version", lit("1"))
 	if c.Name != "" {
 		add("name", str(c.Name))
 	}
@@ -53,13 +53,13 @@ func (c *Config) YAML(header string) ([]byte, error) {
 		add("prefix", str(fmt.Sprintf("C-%c", 'a'+c.Prefix-1)))
 	}
 	if c.MinPane != def.MinPane {
-		add("min_pane", flow(str("w"), str(strconv.Itoa(c.MinPane.W)), str("h"), str(strconv.Itoa(c.MinPane.H))))
+		add("min_pane", flow(str("w"), lit(strconv.Itoa(c.MinPane.W)), str("h"), lit(strconv.Itoa(c.MinPane.H))))
 	}
 	if c.StatusBar != "" && c.StatusBar != def.StatusBar {
 		add("status_bar", str(c.StatusBar))
 	}
 	if c.QuitWhenAllExited {
-		add("quit_when_all_exited", str("true"))
+		add("quit_when_all_exited", lit("true"))
 	}
 
 	// Settings every pane shares are written once at the top.
@@ -103,7 +103,7 @@ func (c *Config) YAML(header string) ([]byte, error) {
 				anyW = anyW || col.Size.Unit != layout.Auto
 			}
 			if anyW && len(r.cols) > 1 {
-				widths = append(widths, str(strconv.Itoa(i+1)), flowList(ws))
+				widths = append(widths, lit(strconv.Itoa(i+1)), flowList(ws))
 			}
 		}
 		add("layout", quoted(strings.Join(counts, ",")))
@@ -239,7 +239,7 @@ func paneNode(p, shared pane.Spec) *yaml.Node {
 		case p.MaxRestarts < 0:
 			kv("max_restarts", "unlimited")
 		case p.MaxRestarts > 0:
-			kv("max_restarts", strconv.Itoa(p.MaxRestarts))
+			m.Content = append(m.Content, str("max_restarts"), lit(strconv.Itoa(p.MaxRestarts)))
 		}
 	}
 	if p.Shell != shared.Shell {
@@ -267,7 +267,12 @@ func envNode(env []string) *yaml.Node {
 
 func sizeText(s layout.Size) string { return s.String() }
 
-func str(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Value: v} }
+// str is a string scalar: tagged !!str, so the encoder quotes values YAML
+// would otherwise read as something else (~, null, true, 123 …).
+func str(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v} }
+
+// lit is a plain scalar written as-is: numbers and booleans.
+func lit(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Value: v} }
 
 func quoted(v string) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Value: v, Style: yaml.DoubleQuotedStyle}

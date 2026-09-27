@@ -1,5 +1,5 @@
 #!/bin/sh
-# C02-cwd-env: a dozer workspace, packaged by dozer 849a950-dirty on 2026-09-26.
+# C02-cwd-env: a dozer workspace, packaged by dozer dc640fc-dirty on 2026-09-26.
 # Self-contained: the configuration is inside this script and is piped
 # straight to dozer (dozer -c -). Nothing else is read or written.
 #
@@ -45,7 +45,7 @@ description: |
 layout: "2,2"
 panes:
   - {title: guide, run: printf '%s\n' "$DOZER_DESCRIPTION" | less -FXR}
-  - {title: cwd ~, run: pwd, cwd: ~}
+  - {title: cwd ~, run: pwd, cwd: "~"}
   - {title: env, run: echo GREETING=$GREETING DOZER_PANE=$DOZER_PANE, env: {GREETING: hello-from-dozer}}
   - {title: cwd /tmp, run: pwd, cwd: /tmp}
 DOZER_YAML

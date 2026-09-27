@@ -41,7 +41,7 @@ type file struct {
 	Name              string              `yaml:"name"`
 	Description       string              `yaml:"description"`
 	Shell             string              `yaml:"shell"`
-	Cwd               string              `yaml:"cwd"`
+	Cwd               yaml.Node           `yaml:"cwd"`
 	Env               map[string]string   `yaml:"env"`
 	Prefix            string              `yaml:"prefix"`
 	Layout            yaml.Node           `yaml:"layout"`
@@ -64,7 +64,7 @@ type paneFile struct {
 	Title    string            `yaml:"title"`
 	Run      string            `yaml:"run"`
 	Exec     string            `yaml:"exec"`
-	Cwd      string            `yaml:"cwd"`
+	Cwd      yaml.Node         `yaml:"cwd"`
 	Env      map[string]string `yaml:"env"`
 	Shell    string            `yaml:"shell"`
 	Restart  string            `yaml:"restart"`
@@ -72,6 +72,22 @@ type paneFile struct {
 	Readonly yaml.Node         `yaml:"readonly"`
 	Group    yaml.Node         `yaml:"group"`
 	Min      yaml.Node         `yaml:"min"`
+}
+
+// pathOf reads a cwd value as written. A bare ~ is YAML for null, so
+// `cwd: ~` would silently mean "no cwd"; here it keeps meaning the home
+// folder. An explicit `null` (or no key) means unset.
+func pathOf(n *yaml.Node) string {
+	switch {
+	case n.Kind == 0:
+		return ""
+	case n.Tag == "!!null":
+		if n.Value == "~" {
+			return "~"
+		}
+		return ""
+	}
+	return n.Value
 }
 
 // Defaults returns the configuration for a bare `dozer`.
@@ -183,8 +199,8 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 	}
 
 	// Panes: a list in reading order, or a map keyed by tree pane names.
-	base := pane.Spec{Shell: f.Shell, Dir: expandDir(f.Cwd, baseDir), Env: envList(f.Env),
-		RawDir: f.Cwd, RawEnv: rawEnvList(f.Env)}
+	base := pane.Spec{Shell: f.Shell, Dir: expandDir(pathOf(&f.Cwd), baseDir), Env: envList(f.Env),
+		RawDir: pathOf(&f.Cwd), RawEnv: rawEnvList(f.Env)}
 	for i := range c.Panes {
 		c.Panes[i] = base
 	}
@@ -281,8 +297,8 @@ func decodePane(n *yaml.Node, base pane.Spec, baseDir string) (pane.Spec, []stri
 	if pf.Shell != "" {
 		s.Shell = pf.Shell
 	}
-	if pf.Cwd != "" {
-		s.Dir, s.RawDir = expandDir(pf.Cwd, baseDir), pf.Cwd
+	if cwd := pathOf(&pf.Cwd); cwd != "" {
+		s.Dir, s.RawDir = expandDir(cwd, baseDir), cwd
 	}
 	if len(pf.Env) > 0 {
 		s.Env = append(append([]string(nil), base.Env...), envList(pf.Env)...)

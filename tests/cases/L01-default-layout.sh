@@ -1,5 +1,5 @@
 #!/bin/sh
-# L01-default-layout: a dozer workspace, packaged by dozer 849a950-dirty on 2026-09-26.
+# L01-default-layout: a dozer workspace, packaged by dozer dc640fc-dirty on 2026-09-26.
 # Self-contained: the configuration is inside this script and is piped
 # straight to dozer (dozer -c -). Nothing else is read or written.
 #

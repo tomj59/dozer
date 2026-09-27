@@ -1,5 +1,5 @@
 #!/bin/sh
-# D04-kill: a dozer workspace, packaged by dozer 7cca6f7-dirty on 2026-09-26.
+# D04-kill: a dozer workspace, packaged by dozer dc640fc-dirty on 2026-09-26.
 # Self-contained: the configuration is inside this script and is piped
 # straight to dozer (dozer -c -). Nothing else is read or written.
 #

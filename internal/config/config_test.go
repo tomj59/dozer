@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -186,6 +187,34 @@ func TestMaxRestarts(t *testing.T) {
 	} {
 		if _, err := Parse([]byte(in), ""); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("Parse(%q) = %v, want %q", in, err, want)
+		}
+	}
+}
+
+// A bare ~ is YAML null; for cwd it must still mean the home folder, and
+// --save must write strings so they read back as strings.
+func TestTildeCwd(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	c, err := Parse([]byte("cwd: ~\npanes: [{cwd: ~}, {cwd: null}, {cwd: \"~/x\"}]"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Panes[0].Dir != home || c.Panes[2].Dir != filepath.Join(home, "x") {
+		t.Errorf("dirs = %q %q %q", c.Panes[0].Dir, c.Panes[1].Dir, c.Panes[2].Dir)
+	}
+	if c.Panes[1].Dir != home { // null = unset → inherits the top-level ~
+		t.Errorf("null cwd should inherit, got %q", c.Panes[1].Dir)
+	}
+	out, _ := c.YAML("")
+	c2, err := Parse(out, "")
+	if err != nil || c2.Panes[0].Dir != home {
+		t.Errorf("round trip: %v %q\n%s", err, c2.Panes[0].Dir, out)
+	}
+	for _, v := range []string{"true", "123", "null"} {
+		c, _ := Parse([]byte(`panes: [{run: "`+v+`"}]`), "")
+		out, _ := c.YAML("")
+		if c2, err := Parse(out, ""); err != nil || c2.Panes[0].Run != v {
+			t.Errorf("run %q did not survive --save: %v\n%s", v, err, out)
 		}
 	}
 }
