@@ -34,3 +34,16 @@ func TestFollow(t *testing.T) {
 		}
 	}
 }
+
+func TestDropPaste(t *testing.T) {
+	for in, want := range map[string]string{
+		"jk":                             "jk",
+		"a\x1b[200~yq\x1b[201~b":         "ab",
+		"\x1b[200~x\x1b[201~\x1b[200~y":  "",
+		"k\x1b[200~one\x1b[201~j\x1b[A": "kj\x1b[A",
+	} {
+		if got := string(dropPaste([]byte(in))); got != want {
+			t.Errorf("dropPaste(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

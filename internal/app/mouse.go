@@ -78,10 +78,9 @@ func (a *App) hitTest(cx, cy int) hit {
 func (a *App) toCanvas(x, y int) (int, int, bool) {
 	w, h := a.term.Size()
 	y0, ah := a.area(w, h)
-	if y < y0 || y >= y0+ah {
-		return 0, 0, false
-	}
-	return x + a.view.vx, y - y0 + a.view.vy, true
+	// Coordinates are returned even off the canvas: a drag that wanders
+	// onto the status bar still needs to know where the pointer is.
+	return x + a.view.vx, y - y0 + a.view.vy, y >= y0 && y < y0+ah
 }
 
 // mouse handles one host mouse event (main loop).

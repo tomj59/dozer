@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/tomj59/dozer/internal/input"
@@ -19,6 +20,7 @@ func (a *App) enterCopy() {
 // (main loop). Keys follow vi, as in tmux's copy mode (docs/SPEC.md §4.4).
 func (a *App) copyInput(b []byte) {
 	p := a.focused()
+	b = dropPaste(b) // pasted text isn't a stream of commands
 	for len(b) > 0 {
 		k, n := input.NextKey(b)
 		b = b[n:]
@@ -151,4 +153,20 @@ func (a *App) clipboard(text string) {
 	a.term.SetClipboard(text)
 	n := len([]rune(text))
 	a.say(fmt.Sprintf("copied %d characters", n))
+}
+
+// dropPaste removes bracketed-paste content (ESC[200~ … ESC[201~).
+func dropPaste(b []byte) []byte {
+	const start, end = "\x1b[200~", "\x1b[201~"
+	for {
+		i := bytes.Index(b, []byte(start))
+		if i < 0 {
+			return b
+		}
+		j := bytes.Index(b[i:], []byte(end))
+		if j < 0 {
+			return b[:i]
+		}
+		b = append(b[:i:i], b[i+j+len(end):]...)
+	}
 }
