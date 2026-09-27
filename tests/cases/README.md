@@ -69,4 +69,4 @@ Record **PASS / FAIL** plus notes (terminal app; a screenshot for anything visua
 
 | ID | Case | Milestone | Result |
 |---|---|---|---|
-| P01 | [Package: flags pass through](P01-passthrough.sh) | M2 | PASS (--heights 30,70 applied) · Terminal.app · 2026-09-26; C-b prefix + --show-config not reported |
+| P01 | [Package: flags pass through](P01-passthrough.sh) | M2 | PASS (--heights 30,70 and --prefix C-b applied) · Terminal.app · 2026-09-26; --show-config not reported |
